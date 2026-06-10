@@ -1,0 +1,11 @@
+PREFIX p:  <http://www.wikidata.org/prop/>
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
+SELECT ?person ?position ?start ?end ?replaces ?replacedBy WHERE {
+  ?person p:P39 ?s . ?s ps:P39 ?position .
+  OPTIONAL { ?s pq:P580 ?start }
+  OPTIONAL { ?s pq:P582 ?end }
+  OPTIONAL { ?s pq:P1365 ?replaces }
+  OPTIONAL { ?s pq:P1366 ?replacedBy }
+  FILTER( BOUND(?start) || BOUND(?end) )
+}

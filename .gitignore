@@ -12,3 +12,8 @@ logs/*
 !logs/.gitkeep
 *.out
 *.err
+
+# Wikidata regenerable artifacts (kept on kg1, not committed)
+data/wikidata/offices/
+data/wikidata/dataset*/
+*.nt.gz

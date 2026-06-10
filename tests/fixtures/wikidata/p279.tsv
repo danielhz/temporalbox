@@ -1,0 +1,6 @@
+?child	?parent
+<http://www.wikidata.org/entity/Q100>	<http://www.wikidata.org/entity/Q300>
+<http://www.wikidata.org/entity/Q300>	<http://www.wikidata.org/entity/Q900>
+<http://www.wikidata.org/entity/Q200>	<http://www.wikidata.org/entity/Q400>
+<http://www.wikidata.org/entity/Q400>	<http://www.wikidata.org/entity/Q900>
+<http://www.wikidata.org/entity/Q999>	<http://www.wikidata.org/entity/Q900>

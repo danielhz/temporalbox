@@ -1,0 +1,6 @@
+?person	?position	?start	?end	?replaces	?replacedBy
+<http://www.wikidata.org/entity/Q1>	<http://www.wikidata.org/entity/Q100>	"2000-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>	"2005-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>		<http://www.wikidata.org/entity/Q2>
+<http://www.wikidata.org/entity/Q2>	<http://www.wikidata.org/entity/Q100>	"2005-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>	"2010-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>	<http://www.wikidata.org/entity/Q1>
+<http://www.wikidata.org/entity/Q3>	<http://www.wikidata.org/entity/Q200>	"2002-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>	"2008-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>
+<http://www.wikidata.org/entity/Q4>	<http://www.wikidata.org/entity/Q300>	"1998-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>
+<http://www.wikidata.org/entity/Q5>	<http://www.wikidata.org/entity/Q100>		"2012-01-01T00:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>
