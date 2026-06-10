@@ -1,0 +1,2 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+SELECT (COUNT(*) AS ?p279_edges) (COUNT(DISTINCT ?c) AS ?classes_with_parent) WHERE { ?c wdt:P279 ?p }

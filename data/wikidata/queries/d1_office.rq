@@ -1,0 +1,18 @@
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
+SELECT
+  (COUNT(*) AS ?stmts)
+  (COUNT(DISTINCT ?pos) AS ?positions)
+  (SUM(IF(BOUND(?start),1,0)) AS ?with_start)
+  (SUM(IF(BOUND(?end),1,0)) AS ?with_end)
+  (SUM(IF(BOUND(?start)&&BOUND(?end),1,0)) AS ?with_interval)
+  (SUM(IF(BOUND(?pit),1,0)) AS ?with_point)
+  (SUM(IF(BOUND(?prev)||BOUND(?next),1,0)) AS ?with_succession)
+WHERE {
+  ?s ps:P39 ?pos .
+  OPTIONAL { ?s pq:P580 ?start }
+  OPTIONAL { ?s pq:P582 ?end }
+  OPTIONAL { ?s pq:P585 ?pit }
+  OPTIONAL { ?s pq:P1365 ?prev }
+  OPTIONAL { ?s pq:P1366 ?next }
+}

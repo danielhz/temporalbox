@@ -1,0 +1,2 @@
+PREFIX p: <http://www.wikidata.org/prop/>
+SELECT (COUNT(DISTINCT ?person) AS ?people_P54) WHERE { ?person p:P54 ?s }

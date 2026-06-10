@@ -1,0 +1,9 @@
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+SELECT
+  (COUNT(DISTINCT ?pos) AS ?positions)
+  (COUNT(DISTINCT ?posWithParent) AS ?positions_with_superclass)
+WHERE {
+  ?s ps:P39 ?pos .
+  OPTIONAL { ?pos wdt:P279 ?parent . BIND(?pos AS ?posWithParent) }
+}
