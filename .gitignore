@@ -13,7 +13,8 @@ logs/*
 *.out
 *.err
 
-# Wikidata regenerable artifacts (kept on kg1, not committed)
+# Wikidata regenerable artifacts (kept on the data server, not committed)
 data/wikidata/offices/
 data/wikidata/dataset*/
 *.nt.gz
+local.mk

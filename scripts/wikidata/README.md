@@ -10,22 +10,26 @@ are gitignored.
 ## Pinned source
 
 - **Dump:** Wikidata 2026-04 full RDF dump, `latest-all.nt.bz2` (N-Triples,
-  `-all` export with the full statement/qualifier model).
-- **Path (kg1):** `/data/ki_nfs_data0/ac/wikidata-dump-2026-04/latest-all.nt.bz2`
-- **Size:** 191,612,079,272 bytes; file date 2026-04-10.
+  `-all` export with the full statement/qualifier model), from
+  <https://dumps.wikimedia.org/wikidatawiki/entities/>.
+- **Size:** 191,612,079,272 bytes; dumped 2026-04-08/10.
+- Point `WD_DUMP` at a local copy of this exact file.
 
-## Tooling (present on kg1)
+## Tooling
 
-`lbzip2`, `pigz`, `grep`; `oxigraph_server` 0.3.23 (`~/.cargo/bin`); Python ≥3.10.
+`lbzip2`, `pigz`, `grep`; `oxigraph_server` 0.3.23 (Apache-2.0/MIT, via
+`cargo install oxigraph_server`); Python ≥3.10; Java 11+ for the ELK
+cross-check (`scripts/oracle/run_elk.sh`, ELK 0.6.0 pinned).
 
 ## Steps
 
-All of steps 1–3 run on **kg1** (that is where the dump and the disk space
-are). Step 4 is pure Python and runs anywhere.
+Steps 1–3 run wherever the dump copy and the disk space are (a data server);
+step 4 is pure Python and runs anywhere.
 
 ```bash
-# 1. Extract the temporally-qualified predicate subset (one streaming pass; ~2h40m, NFS-bound)
-bash 01_extract_subset.sh        # -> ~/wd-extract/subset.nt.gz  (51.5M triples, ~1.1 GB)
+# 1. Extract the temporally-qualified predicate subset (one streaming pass; hours, IO-bound)
+WD_DUMP=/path/to/latest-all.nt.bz2 bash 01_extract_subset.sh
+#                                  # -> ~/wd-extract/subset.nt.gz  (51.5M triples, ~1.1 GB)
 
 # 2. Load the subset into a local oxigraph store (~4 min)
 bash 02_load_oxigraph.sh         # -> ~/wd-extract/store  (~14 GB)

@@ -1,22 +1,29 @@
 """
-Normalize a raw LTEL TBox into the normal forms NF1–NF13.
+Normalize a raw LTEL TBox into the normal forms (NF1–NF7, NF10, NF12, NF13).
 
 The procedure introduces fresh auxiliary concept names for any complex
 sub-expression, mirroring the standard EL+ normalization (Baader et al. 2005)
-extended to the temporal operators.
+extended to the temporal operators. Normalization is a conservative extension,
+not a per-model equivalence, and it requires the polarity restriction
+(right of ⊑: ○, □ only; left of ⊑: ○, U, ◇ only) — axioms violating it have
+no normal form, and `normalize` raises PolarityError on them.
 """
 
 from __future__ import annotations
-from typing import Iterator
 
 from .ontology import (
     TOP, TOP_NAME,
     ConceptName, Conjunction, Existential, NextC, Until, Globally, Eventually,
     ConceptExpr, GCI, RoleInclusion,
     LTELTBox, NormalFormTBox,
-    NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF8, NF9, NF10, NF11, NF12, NF13,
+    NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF10, NF12, NF13,
     NormalFormGCI,
 )
+
+
+class PolarityError(ValueError):
+    """Raised on an axiom outside the polarity-restricted fragment:
+    ◇ or U on the right of ⊑, or □ on the left."""
 
 
 class _Normalizer:
@@ -32,78 +39,89 @@ class _Normalizer:
         self._concepts.add(name)
         return name
 
-    def _name(self, expr: ConceptExpr) -> str:
-        """Return the concept-name string for expr, introducing aux names as needed."""
+    def _name_right(self, expr: ConceptExpr) -> str:
+        """Name an expression occurring in RIGHT (positive) position.
+
+        A fresh aux is defined by `aux ⊑ expr`, so the aux can stand in for
+        the expression wherever it appears as a superconcept.
+        """
         if expr is TOP:
             return TOP_NAME
         if isinstance(expr, ConceptName):
             self._concepts.add(expr.name)
             return expr.name
-        # Complex expression: name it with a fresh concept, add defining GCIs.
         aux = self._fresh()
-        self._define(aux, expr)
+        self._emit_rhs(aux, expr)
         return aux
 
-    def _define(self, name: str, expr: ConceptExpr) -> None:
-        """Emit GCIs that define `name` to be equivalent to `expr`."""
-        # We emit only the ⊑ direction (name ⊑ expr), which is sufficient for
-        # a faithful embedding: the loss encodes the axioms of the TBox, not
-        # the full equivalence.  The closure / training can handle the rest.
-        self._emit_rhs(name, expr)
+    def _name_left(self, expr: ConceptExpr) -> str:
+        """Name an expression occurring in LEFT (negative) position.
+
+        A fresh aux is defined by `expr ⊑ aux`, so the aux can stand in for
+        the expression wherever it appears as a subconcept.
+        """
+        if expr is TOP:
+            return TOP_NAME
+        if isinstance(expr, ConceptName):
+            self._concepts.add(expr.name)
+            return expr.name
+        aux = self._fresh()
+        self._emit_lhs(expr, aux)
+        return aux
 
     def _emit_rhs(self, lhs_name: str, rhs: ConceptExpr) -> None:
-        """Emit the normal form for `lhs_name ⊑ rhs`."""
+        """Emit the normal form for `lhs_name ⊑ rhs`. Right polarity: ○, □ only."""
         if rhs is TOP or isinstance(rhs, ConceptName):
-            self._gcis.append(NF1(lhs_name, self._name(rhs)))
+            self._gcis.append(NF1(lhs_name, self._name_right(rhs)))
         elif isinstance(rhs, Conjunction):
-            b = self._name(rhs.left)
-            c = self._name(rhs.right)
-            self._gcis.append(NF1(lhs_name, b))
-            self._gcis.append(NF1(lhs_name, c))
+            self._emit_rhs(lhs_name, rhs.left)
+            self._emit_rhs(lhs_name, rhs.right)
         elif isinstance(rhs, Existential):
             self._roles.add(rhs.role)
-            b = self._name(rhs.filler)
+            b = self._name_right(rhs.filler)
             self._gcis.append(NF3(lhs_name, rhs.role, b))
         elif isinstance(rhs, NextC):
-            b = self._name(rhs.concept)
+            b = self._name_right(rhs.concept)
             self._gcis.append(NF6(lhs_name, b))
         elif isinstance(rhs, Globally):
-            b = self._name(rhs.concept)
+            b = self._name_right(rhs.concept)
             self._gcis.append(NF7(lhs_name, b))
         elif isinstance(rhs, Eventually):
-            b = self._name(rhs.concept)
-            self._gcis.append(NF8(lhs_name, b))
+            raise PolarityError(
+                f"◇ on the right of ⊑ has no normal form (in: {lhs_name} ⊑ {rhs})"
+            )
         elif isinstance(rhs, Until):
-            bl = self._name(rhs.left)
-            br = self._name(rhs.right)
-            self._gcis.append(NF9(lhs_name, bl, br))
+            raise PolarityError(
+                f"U on the right of ⊑ has no normal form (in: {lhs_name} ⊑ {rhs})"
+            )
         else:
             raise TypeError(f"Unhandled rhs type: {type(rhs)}")
 
     def _emit_lhs(self, lhs: ConceptExpr, rhs_name: str) -> None:
-        """Emit the normal form for `lhs ⊑ rhs_name`."""
+        """Emit the normal form for `lhs ⊑ rhs_name`. Left polarity: ○, U, ◇ only."""
         if lhs is TOP or isinstance(lhs, ConceptName):
-            self._gcis.append(NF1(self._name(lhs), rhs_name))
+            self._gcis.append(NF1(self._name_left(lhs), rhs_name))
         elif isinstance(lhs, Conjunction):
-            a1 = self._name(lhs.left)
-            a2 = self._name(lhs.right)
+            a1 = self._name_left(lhs.left)
+            a2 = self._name_left(lhs.right)
             self._gcis.append(NF2(a1, a2, rhs_name))
         elif isinstance(lhs, Existential):
             self._roles.add(lhs.role)
-            a = self._name(lhs.filler)
+            a = self._name_left(lhs.filler)
             self._gcis.append(NF4(lhs.role, a, rhs_name))
         elif isinstance(lhs, NextC):
-            a = self._name(lhs.concept)
+            a = self._name_left(lhs.concept)
             self._gcis.append(NF10(a, rhs_name))
         elif isinstance(lhs, Globally):
-            a = self._name(lhs.concept)
-            self._gcis.append(NF11(a, rhs_name))
+            raise PolarityError(
+                f"□ on the left of ⊑ has no normal form (in: {lhs} ⊑ {rhs_name})"
+            )
         elif isinstance(lhs, Eventually):
-            a = self._name(lhs.concept)
+            a = self._name_left(lhs.concept)
             self._gcis.append(NF12(a, rhs_name))
         elif isinstance(lhs, Until):
-            al = self._name(lhs.left)
-            ar = self._name(lhs.right)
+            al = self._name_left(lhs.left)
+            ar = self._name_left(lhs.right)
             self._gcis.append(NF13(al, ar, rhs_name))
         else:
             raise TypeError(f"Unhandled lhs type: {type(lhs)}")
@@ -114,14 +132,15 @@ class _Normalizer:
         rhs_atomic = rhs is TOP or isinstance(rhs, ConceptName)
 
         if lhs_atomic and rhs_atomic:
-            self._gcis.append(NF1(self._name(lhs), self._name(rhs)))
+            self._gcis.append(NF1(self._name_left(lhs), self._name_right(rhs)))
         elif lhs_atomic:
-            self._emit_rhs(self._name(lhs), rhs)
+            self._emit_rhs(self._name_left(lhs), rhs)
         elif rhs_atomic:
-            self._emit_lhs(lhs, self._name(rhs))
+            self._emit_lhs(lhs, self._name_right(rhs))
         else:
-            # Both sides complex: introduce aux for rhs, normalise lhs ⊑ aux.
-            aux = self._name(rhs)
+            # Both sides complex: introduce aux for rhs (right polarity),
+            # then normalise lhs ⊑ aux (left polarity).
+            aux = self._name_right(rhs)
             self._emit_lhs(lhs, aux)
 
     def process_role_inclusion(self, ri: RoleInclusion) -> None:

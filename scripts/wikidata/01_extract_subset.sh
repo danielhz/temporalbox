@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # Step 1 — extract the temporally-qualified predicate subset from the pinned
-# Wikidata RDF dump. Run on kg1 (where the dump lives). One streaming pass.
+# Wikidata RDF dump. Run wherever the dump copy lives. One streaming pass.
 #
-#   bash 01_extract_subset.sh [DUMP] [OUTDIR]
+#   WD_DUMP=/path/to/latest-all.nt.bz2 bash 01_extract_subset.sh [OUTDIR]
 #
-# Defaults reproduce the paper's subset from the pinned 2026-04 dump.
+# Pinned source (public): Wikidata "latest-all" RDF dump of 2026-04
+# (latest-all.nt.bz2, 191,612,079,272 bytes, dumped 2026-04-08/10), from
+# https://dumps.wikimedia.org/wikidatawiki/entities/ . Use a local copy.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DUMP="${1:-/data/ki_nfs_data0/ac/wikidata-dump-2026-04/latest-all.nt.bz2}"
-OUTDIR="${2:-$HOME/wd-extract}"
+DUMP="${WD_DUMP:?set WD_DUMP to the local path of latest-all.nt.bz2}"
+OUTDIR="${1:-$HOME/wd-extract}"
 CORES="${CORES:-6}"      # be polite on the shared host
 
 mkdir -p "$OUTDIR"

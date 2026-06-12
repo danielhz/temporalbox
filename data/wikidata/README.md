@@ -1,22 +1,19 @@
 # Wikidata temporal subset — extraction and domain profiling
 
-Profiling of candidate domains for the LTEL real-data experiment (Phase 2).
-This records what is on kg1, how the subset was extracted, and the density
-profile that motivates the seed-domain choice. All numbers from the pinned
-dump below; reproduce with the queries in `queries/`.
+Profiling of candidate domains for the LTEL real-data experiment (Phase 2):
+how the subset was extracted and the density profile that motivates the
+seed-domain choice. All numbers from the pinned dump below; reproduce with
+the queries in `queries/` and the pipeline in `../../scripts/wikidata/`.
 
 ## Pinned data source
 
 - **Dump:** Wikidata 2026-04 full RDF dump, `latest-all.nt.bz2`
-  (N-Triples, the `-all` export with the full statement/qualifier model).
-- **Path (kg1):** `/data/ki_nfs_data0/ac/wikidata-dump-2026-04/latest-all.nt.bz2`
-- **Size:** 191,612,079,272 bytes compressed; file date 2026-04-10.
-- **Disk:** the dump lives on the *remote* NFS mount
-  (`ki-nfs.tik.uni-stuttgart.de:/ki_nfs_data0`), which is the slow/archival
-  disk — hence we stream it exactly once. (A 2023-05-22 Jena TDB2 temporal
-  index also exists on kg1's fast local disk but is owned by another user and
-  not writable, so TDB2 cannot open it; the dump path is dependency-free and
-  gives fresher 2026-04 data.)
+  (N-Triples, the `-all` export with the full statement/qualifier model),
+  from <https://dumps.wikimedia.org/wikidatawiki/entities/>.
+- **Size:** 191,612,079,272 bytes compressed; dumped 2026-04-08/10.
+- **Why one streaming pass:** the dump copy sits on slow archival storage, so
+  the pipeline reads it exactly once (a pre-existing 2023 triple-store index
+  was unusable — read-only permissions — and the dump is fresher anyway).
 
 ## Why the RDF dump, not the JSON
 
@@ -42,8 +39,8 @@ lbzip2 -dc -n 6 latest-all.nt.bz2 | grep -F -f patterns.txt | pigz > subset.nt.g
 - Result: **51,501,678 triples, 1.1 GB gz**. Streaming pass wall time ≈ 2h40m
   (NFS-read bound).
 
-The subset is then loaded into a local **oxigraph** store (own store, on kg1
-fast local disk — no permission issue) and profiled with SPARQL:
+The subset is then loaded into a local **oxigraph** store (user-owned, on the
+data server's fast local disk) and profiled with SPARQL:
 
 ```
 pigz -dc subset.nt.gz | oxigraph_server -l ./store load --format nt --lenient   # 51.5M triples in 256s

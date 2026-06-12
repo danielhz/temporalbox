@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Step 2 — load the extracted subset into a local oxigraph store. Run on kg1.
+# Step 2 — load the extracted subset into a local oxigraph store. Run on the
+# data server.
 #
 #   bash 02_load_oxigraph.sh [OUTDIR]
 #

@@ -11,11 +11,11 @@ embedding design is finalized.
 
 from __future__ import annotations
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .ontology import (
     TOP_NAME,
-    NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF8, NF9, NF10, NF11, NF12, NF13,
+    NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF10, NF12, NF13,
     NormalFormGCI, NormalFormTBox,
 )
 from .closure import compute_el_closure
@@ -23,6 +23,10 @@ from .closure import compute_el_closure
 
 @dataclass
 class SyntheticConfig:
+    """Generator knobs. Only polarity-respecting GCI types are available
+    (right of ⊑: ○, □; left of ⊑: ○, U, ◇) — right-◇/right-U/left-□ have no
+    normal form and are deliberately absent."""
+
     n_concepts: int = 20
     n_roles: int = 3
     # Approximate GCI counts per type.  Set to 0 to skip a type.
@@ -33,10 +37,7 @@ class SyntheticConfig:
     n_nf5: int = 2    # r ∘ s ⊑ t
     n_nf6: int = 5    # A ⊑ ○B
     n_nf7: int = 4    # A ⊑ □B
-    n_nf8: int = 4    # A ⊑ ◇B
-    n_nf9: int = 3    # A ⊑ B U C
     n_nf10: int = 3   # ○A ⊑ B
-    n_nf11: int = 2   # □A ⊑ B
     n_nf12: int = 2   # ◇A ⊑ B
     n_nf13: int = 2   # (A U C) ⊑ B
     seed: int = 0
@@ -106,21 +107,9 @@ def generate_tbox(cfg: SyntheticConfig | None = None) -> SyntheticDataset:
         a, b = rc2()
         gcis.append(NF7(a, b))
 
-    for _ in range(cfg.n_nf8):
-        a, b = rc2()
-        gcis.append(NF8(a, b))
-
-    for _ in range(cfg.n_nf9):
-        a, bl, br = rc(), rc(), rc()
-        gcis.append(NF9(a, bl, br))
-
     for _ in range(cfg.n_nf10):
         a, b = rc2()
         gcis.append(NF10(a, b))
-
-    for _ in range(cfg.n_nf11):
-        a, b = rc2()
-        gcis.append(NF11(a, b))
 
     for _ in range(cfg.n_nf12):
         a, b = rc2()

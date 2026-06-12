@@ -1,10 +1,13 @@
-AISA        = aisa
-AISA_DIR    = ~/nesy-ltel-code
+# Host aliases for the GPU cluster (training) and the backup/data server.
+# Set the real SSH host names in a gitignored `local.mk` (or the environment):
+#   CLUSTER = <ssh-alias-of-gpu-cluster>
+#   BACKUP  = <ssh-alias-of-backup-server>
+CLUSTER    ?= cluster
+BACKUP     ?= backup
+-include local.mk
 
-# kg1 is the backup server — mirror results here because aisa goes into maintenance.
-KG1         = kg1
-KG1_DIR     = ~/nesy-ltel-backup/nesy-ltel
-
+CLUSTER_DIR = ~/nesy-ltel-code
+BACKUP_DIR  = ~/nesy-ltel-backup/nesy-ltel
 LOCAL_DIR   = $(shell pwd)
 
 RSYNC_OPTS  = --archive --compress --exclude='.git' \
@@ -14,22 +17,22 @@ RSYNC_OPTS  = --archive --compress --exclude='.git' \
 
 .PHONY: sync-push sync-pull sync-backup sync-roundtrip test lint
 
-## Push local code to aisa (excluding results/).
+## Push local code to the GPU cluster (excluding results/).
 sync-push:
-	rsync $(RSYNC_OPTS) --exclude='results/' $(LOCAL_DIR)/ $(AISA):$(AISA_DIR)/
+	rsync $(RSYNC_OPTS) --exclude='results/' $(LOCAL_DIR)/ $(CLUSTER):$(CLUSTER_DIR)/
 
-## Pull results/ from aisa to local.
+## Pull results/ from the GPU cluster to local.
 sync-pull:
-	rsync --archive --compress $(AISA):$(AISA_DIR)/results/ $(LOCAL_DIR)/results/
+	rsync --archive --compress $(CLUSTER):$(CLUSTER_DIR)/results/ $(LOCAL_DIR)/results/
 
-## Mirror results/ from aisa → local → kg1 (run after sync-pull).
+## Mirror results/ from the cluster -> local -> backup server (run after sync-pull).
 sync-backup: sync-pull
-	ssh $(KG1) "mkdir -p $(KG1_DIR)/results"
-	rsync --archive --compress $(LOCAL_DIR)/results/ $(KG1):$(KG1_DIR)/results/
+	ssh $(BACKUP) "mkdir -p $(BACKUP_DIR)/results"
+	rsync --archive --compress $(LOCAL_DIR)/results/ $(BACKUP):$(BACKUP_DIR)/results/
 
-## Push code, pull results, backup to kg1 in one go.
+## Push code, pull results, mirror to backup in one go.
 sync-roundtrip: sync-push sync-backup
-	rsync --archive --compress $(AISA):$(AISA_DIR)/logs/ $(LOCAL_DIR)/logs/
+	rsync --archive --compress $(CLUSTER):$(CLUSTER_DIR)/logs/ $(LOCAL_DIR)/logs/
 
 ## Run local tests (no GPU required).
 test:

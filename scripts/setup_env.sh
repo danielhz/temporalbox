@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Set up the Python virtual environment on aisa.
-# Run once from the aisa login node after the first sync-push:
+# Set up the Python virtual environment on the GPU cluster.
+# Run once from the cluster login node after the first sync-push:
 #   bash ~/nesy-ltel-code/scripts/setup_env.sh
 set -euo pipefail
 

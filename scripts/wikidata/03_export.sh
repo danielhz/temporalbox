@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Step 3 — export the office-membership and subclass TSVs from the oxigraph
-# store via SPARQL. Run on kg1.
+# store via SPARQL. Run on the data server.
 #
 #   bash 03_export.sh [OUTDIR]
 #

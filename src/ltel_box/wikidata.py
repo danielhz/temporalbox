@@ -2,7 +2,7 @@
 Build an LTEL dataset from a Wikidata political-office extract.
 
 Input: two TSV files exported (by SPARQL, see scripts/wikidata/) from the
-pinned Wikidata 2026-04 dump on kg1:
+pinned Wikidata 2026-04 dump:
 
   memberships.tsv : ?person ?position ?start ?end ?replaces ?replacedBy
                     (one row per time-qualified `position held` (P39)
@@ -113,7 +113,7 @@ class _RawMembership:
 def _parse_memberships(path: Path) -> list[_RawMembership]:
     rows: list[_RawMembership] = []
     with path.open() as f:
-        header = f.readline()  # ?person ?position ?start ?end ?replaces ?replacedBy
+        f.readline()  # header: ?person ?position ?start ?end ?replaces ?replacedBy
         for line in f:
             cols = line.rstrip("\n").split("\t")
             if len(cols) < 2:

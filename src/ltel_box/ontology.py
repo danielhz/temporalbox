@@ -12,17 +12,23 @@ Normal-form GCI shapes (lhs/rhs are concept names or ⊤ unless stated):
     NF5   r ∘ s ⊑ t              (role chain inclusion)
     NF6   A ⊑ ○B                 (next on rhs)
     NF7   A ⊑ □B                 (globally on rhs)
-    NF8   A ⊑ ◇B                 (eventually on rhs)
-    NF9   A ⊑ B U C              (until on rhs)
     NF10  ○A ⊑ B                 (next on lhs)
-    NF11  □A ⊑ B                 (globally on lhs)
     NF12  ◇A ⊑ B                 (eventually on lhs)
     NF13  (A U C) ⊑ B            (until on lhs)
+
+Polarity restriction (normal-form lemma, paper §3): the temporal operators
+admitted are ○ and □ on the RIGHT of ⊑, and ○, U, ◇ on the LEFT. Axioms with
+◇ or U on the right, or □ on the left, have NO normal form (normalization is a
+conservative extension and fresh names cannot capture these shapes in the
+positive fragment); `normalize` raises PolarityError on them. The numbering
+gap (no NF8, NF9, NF11) is intentional — those were the forbidden shapes
+(right-◇, right-U, left-□) and are kept out of the type union so they cannot
+be constructed.
 """
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Union, Sequence
+from typing import Union
 
 # ── Concept expressions ──────────────────────────────────────────────────────
 
@@ -185,26 +191,7 @@ class NF7:
 
 
 @dataclass(frozen=True)
-class NF8:
-    lhs: str
-    rhs: str
-
-
-@dataclass(frozen=True)
-class NF9:
-    lhs: str
-    until_left: str
-    until_right: str
-
-
-@dataclass(frozen=True)
 class NF10:
-    lhs: str
-    rhs: str
-
-
-@dataclass(frozen=True)
-class NF11:
     lhs: str
     rhs: str
 
@@ -222,7 +209,7 @@ class NF13:
     rhs: str
 
 
-NormalFormGCI = Union[NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF8, NF9, NF10, NF11, NF12, NF13]
+NormalFormGCI = Union[NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF10, NF12, NF13]
 
 
 # ── TBox ─────────────────────────────────────────────────────────────────────

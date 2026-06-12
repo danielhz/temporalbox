@@ -1,13 +1,15 @@
 """
-BoxEL-style loss terms for LTEL box embeddings.
+BoxEL-style loss terms for LTEL box embeddings (Option A).
 
-Static loss terms (NF1–NF5) are complete and match the BoxEL construction
-(Xiong et al., ISWC 2022).  Temporal loss terms (NF6–NF13) have the correct
-signatures but raise NotImplementedError until the architecture decisions
-(single-space-per-time-point vs. time-augmented box) are finalized.
+Static loss terms (NF1–NF5) match the BoxEL construction (Xiong et al.,
+ISWC 2022).  Temporal loss terms implement Option A — one box per concept per
+lasso position — for the polarity-restricted normal forms only (right of ⊑:
+○, □; left of ⊑: ○, U, ◇).  The trainer enumerates lasso positions/witnesses
+and passes already-indexed tensors.
 
-All functions operate on raw tensors rather than a model object so they can
-be composed freely during architecture exploration.
+All functions operate on raw tensors rather than a model object, so any
+box-producing scorer can be plugged in (method-agnostic, for the RQ2
+comparison).
 
 Box representation:
     center: (..., d)   real-valued
@@ -125,45 +127,102 @@ def nf5_loss(
     return (delta_r1 + delta_r2 - delta_t).pow(2).sum(dim=-1)
 
 
-# ── Temporal loss terms (NF6–NF13) — stubs ───────────────────────────────────
-# Signatures are fixed; implementations will be added once the architecture
-# (single-space-per-time-point vs. time-augmented box) is decided.
+# ── Temporal loss terms (Option A: per-time-point boxes over a lasso) ────────
+#
+# Each concept A has one box Box(A)^(t) per lasso position t ∈ {0..k}. The
+# *trainer* enumerates positions and witnesses (σ(t), future(t), V(t,s)) and
+# calls these functions with the already-indexed tensors, so the losses stay
+# method-agnostic (any box-producing scorer can be plugged in for RQ2).
+#
+# Only the polarity-restricted forms exist (right: ○, □; left: ○, U, ◇);
+# right-◇/right-U/left-□ have no normal form and hence no loss.
 
-def nf6_loss(*args, **kwargs) -> Tensor:
-    """A ⊑ ○B — Next operator on rhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf6_loss: architecture not yet decided")
+def box_meet_many(centers: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, Tensor]:
+    """
+    Iterated coordinate-wise intersection of n boxes.
 
-
-def nf7_loss(*args, **kwargs) -> Tensor:
-    """A ⊑ □B — Globally on rhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf7_loss: architecture not yet decided")
-
-
-def nf8_loss(*args, **kwargs) -> Tensor:
-    """A ⊑ ◇B — Eventually on rhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf8_loss: architecture not yet decided")
-
-
-def nf9_loss(*args, **kwargs) -> Tensor:
-    """A ⊑ B U C — Until on rhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf9_loss: architecture not yet decided")
-
-
-def nf10_loss(*args, **kwargs) -> Tensor:
-    """○A ⊑ B — Next on lhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf10_loss: architecture not yet decided")
-
-
-def nf11_loss(*args, **kwargs) -> Tensor:
-    """□A ⊑ B — Globally on lhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf11_loss: architecture not yet decided")
+    centers/offsets: (..., n, d) — n boxes per batch element.
+    Returns (center_meet, offset_meet, nonempty) with shapes
+    (..., d), (..., d), (...,).  offset_meet may have negative entries when
+    the meet is empty; nonempty reports emptiness, and callers must mask with
+    it (as in nf2_loss).
+    """
+    lb = (centers - offsets).max(dim=-2).values
+    ub = (centers + offsets).min(dim=-2).values
+    center_meet = (lb + ub) / 2
+    offset_meet = (ub - lb) / 2
+    nonempty = (offset_meet >= 0).all(dim=-1)
+    return center_meet, offset_meet, nonempty
 
 
-def nf12_loss(*args, **kwargs) -> Tensor:
-    """◇A ⊑ B — Eventually on lhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf12_loss: architecture not yet decided")
+def nf6_loss(
+    center_A_t: Tensor, offset_A_t: Tensor,
+    center_B_next: Tensor, offset_B_next: Tensor,
+) -> Tensor:
+    """A ⊑ ○B at position t — Box(A)^(t) ⊆ Box(B)^(σ(t)).
+
+    The caller passes B's box at the *successor* position σ(t) (which wraps
+    to the loop index ℓ at t = k).
+    """
+    return box_contains(center_A_t, offset_A_t, center_B_next, offset_B_next)
 
 
-def nf13_loss(*args, **kwargs) -> Tensor:
-    """(A U C) ⊑ B — Until on lhs.  NOT YET IMPLEMENTED."""
-    raise NotImplementedError("nf13_loss: architecture not yet decided")
+def nf7_loss(
+    center_A_t: Tensor, offset_A_t: Tensor,
+    centers_B_future: Tensor, offsets_B_future: Tensor,
+) -> Tensor:
+    """A ⊑ □B at position t — Box(A)^(t) ⊆ Box(B)^(s) for every s ∈ future(t).
+
+    centers_B_future/offsets_B_future: (..., m, d), B's boxes stacked over the
+    m = |future(t)| positions.  Sum of containment violations over s.
+    """
+    c_A = center_A_t.unsqueeze(-2)
+    o_A = offset_A_t.unsqueeze(-2)
+    return box_contains(c_A, o_A, centers_B_future, offsets_B_future).sum(dim=-1)
+
+
+def nf10_loss(
+    center_A_next: Tensor, offset_A_next: Tensor,
+    center_B_t: Tensor, offset_B_t: Tensor,
+) -> Tensor:
+    """○A ⊑ B at position t — Box(A)^(σ(t)) ⊆ Box(B)^(t)."""
+    return box_contains(center_A_next, offset_A_next, center_B_t, offset_B_t)
+
+
+def nf12_loss(
+    centers_A_future: Tensor, offsets_A_future: Tensor,
+    center_B_t: Tensor, offset_B_t: Tensor,
+) -> Tensor:
+    """◇A ⊑ B at position t — Box(A)^(s) ⊆ Box(B)^(t) for every s ∈ future(t).
+
+    centers_A_future/offsets_A_future: (..., m, d).  Sum over s: an element
+    eventually in A (at any visited s) must be in B now.
+    """
+    c_B = center_B_t.unsqueeze(-2)
+    o_B = offset_B_t.unsqueeze(-2)
+    return box_contains(centers_A_future, offsets_A_future, c_B, o_B).sum(dim=-1)
+
+
+def nf13_witness_loss(
+    center_B_s: Tensor, offset_B_s: Tensor,
+    centers_A_between: Tensor | None, offsets_A_between: Tensor | None,
+    center_C_t: Tensor, offset_C_t: Tensor,
+) -> Tensor:
+    """(A U B) ⊑ C at position t, for ONE witness position s ∈ future(t):
+
+        Box(B)^(s) ⊓ ⨅_{p ∈ V(t,s)} Box(A)^(p)  ⊆  Box(C)^(t)
+
+    centers_A_between/offsets_A_between: (..., |V|, d) — A's boxes over the
+    between-set V(t,s); pass None when V is empty (s = t), reducing the
+    constraint to Box(B)^(t) ⊆ Box(C)^(t).  Vacuously satisfied (zero loss)
+    when the meet is empty.  The trainer sums this over all witnesses s.
+    """
+    if centers_A_between is None:
+        return box_contains(center_B_s, offset_B_s, center_C_t, offset_C_t)
+    all_c = torch.cat([center_B_s.unsqueeze(-2), centers_A_between], dim=-2)
+    all_o = torch.cat([offset_B_s.unsqueeze(-2), offsets_A_between], dim=-2)
+    cm, om, nonempty = box_meet_many(all_c, all_o)
+    # Clamp the (possibly negative) empty-meet offsets so box_contains gets a
+    # well-formed box; the nonempty mask zeroes those terms anyway.
+    om = om.clamp_min(0.0)
+    return box_contains(cm, om, center_C_t, offset_C_t) * nonempty.float()
