@@ -47,6 +47,19 @@ def box_contains(
     return loss.sum(dim=-1)
 
 
+def point_in_box_loss(
+    point: Tensor,
+    center: Tensor,
+    offset: Tensor,
+) -> Tensor:
+    """Penalty for `point` lying outside the box (0 when inside).
+
+    Used for ABox membership: an individual's point must lie in the box of
+    each concept it belongs to at the relevant time point. Shape (...,).
+    """
+    return F.relu((point - center).abs() - offset).sum(dim=-1)
+
+
 def box_meet(
     center_a: Tensor,
     offset_a: Tensor,

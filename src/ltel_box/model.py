@@ -83,6 +83,7 @@ class TemporalBoxModel(nn.Module):
         loop: int,
         dim: int,
         top_id: int = 0,
+        n_individuals: int = 0,
         seed: int | None = None,
     ) -> None:
         super().__init__()
@@ -94,11 +95,18 @@ class TemporalBoxModel(nn.Module):
         self.loop = loop
         self.dim = dim
         self.top_id = top_id
+        self.n_individuals = n_individuals
 
         self.centers = nn.Parameter(torch.rand(n_concepts, k + 1, dim))
         # softplus(-1.5) ≈ 0.20: boxes start as modest cubes
         self.offsets_raw = nn.Parameter(torch.full((n_concepts, k + 1, dim), -1.5))
         self.role_emb = nn.Parameter(torch.randn(max(n_roles, 1), dim) * 0.1)
+        # Constant domain: one rigid point per individual, shared across ticks.
+        # Non-rigid membership comes from the per-tick boxes moving, not the
+        # points — this is the coupling that makes the per-time-point boxes do
+        # real work on the slice.
+        if n_individuals > 0:
+            self.points = nn.Parameter(torch.rand(n_individuals, dim))
 
     def concept_box(self, concept_ids: Tensor, positions: Tensor) -> tuple[Tensor, Tensor]:
         c = self.centers[concept_ids, positions]
@@ -110,3 +118,6 @@ class TemporalBoxModel(nn.Module):
 
     def role_delta(self, role_ids: Tensor) -> Tensor:
         return self.role_emb[role_ids]
+
+    def individual_point(self, individual_ids: Tensor) -> Tensor:
+        return self.points[individual_ids]
