@@ -234,6 +234,17 @@ def build_dataset(
     lo, hi = min(years), max(years)
 
     if cfg.granularity == "year":
+        # Guard against garbage Wikidata dates (e.g. year -2,343,126) blowing
+        # the calendar timeline into millions of empty ticks. Event granularity
+        # is immune (it only uses occurring change-points); for year, clip the
+        # range with min_year/max_year.
+        span = hi - lo + 1
+        if span > 10_000:
+            raise ValueError(
+                f"year granularity would create {span} ticks (year range [{lo}, {hi}]); "
+                "likely outlier dates — set min_year/max_year to clip, or use "
+                "granularity='event' (bounded by occurring change-points)"
+            )
         time_points = list(range(lo, hi + 1))
     else:  # event-based: ticks are the sorted distinct endpoints
         time_points = sorted({y for y in years})
@@ -330,3 +341,50 @@ def save_dataset(ds: WikidataOfficeDataset, outdir: str | Path) -> None:
             f.write(f"{i}\t{t}\n")
     with (out / "meta.json").open("w") as f:
         json.dump({"config": asdict(ds.config), "stats": ds.stats}, f, indent=2)
+
+
+def load_dataset(indir: str | Path) -> WikidataOfficeDataset:
+    """Load a dataset materialised by save_dataset (lets the small built dataset
+    travel to the GPU host instead of the multi-hundred-MB source TSVs)."""
+    d = Path(indir)
+    meta = json.loads((d / "meta.json").read_text())
+
+    nf_gcis: list = []
+    concepts: set[str] = set()
+    with (d / "tbox.tsv").open() as f:
+        f.readline()
+        for line in f:
+            child, parent = line.rstrip("\n").split("\t")
+            nf_gcis.append(NF1(child, parent))
+            concepts.update((child, parent))
+    tbox = NormalFormTBox(frozenset(concepts), frozenset(), nf_gcis)
+    vocab = Vocabulary.from_tbox(tbox)
+
+    closure: set[tuple[str, str]] = set()
+    with (d / "closure.tsv").open() as f:
+        f.readline()
+        for line in f:
+            a, b = line.rstrip("\n").split("\t")
+            closure.add((a, b))
+
+    individuals: set[str] = set()
+    memberships: list[MembershipInterval] = []
+    with (d / "memberships.tsv").open() as f:
+        f.readline()
+        for line in f:
+            person, position, s, e = line.rstrip("\n").split("\t")
+            memberships.append(MembershipInterval(person, position, int(s), int(e)))
+            individuals.add(person)
+
+    time_points: list[int] = []
+    with (d / "time_points.tsv").open() as f:
+        f.readline()
+        for line in f:
+            time_points.append(int(line.rstrip("\n").split("\t")[1]))
+
+    return WikidataOfficeDataset(
+        tbox=tbox, vocab=vocab, individuals=sorted(individuals),
+        time_points=time_points, memberships=memberships,
+        subsumption_closure=frozenset(closure),
+        config=WikidataConfig(**meta["config"]), stats=meta["stats"],
+    )

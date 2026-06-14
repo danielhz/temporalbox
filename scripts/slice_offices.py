@@ -23,15 +23,18 @@ from ltel_box.logging_utils import ExperimentLogger                     # noqa: 
 from ltel_box.slice_trainer import (                                    # noqa: E402
     SliceTrainConfig, evaluate_slice, train_slice,
 )
-from ltel_box.wikidata import WikidataConfig, build_dataset             # noqa: E402
+from ltel_box.wikidata import WikidataConfig, build_dataset, load_dataset  # noqa: E402
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--memberships", required=True)
-    ap.add_argument("--p279", required=True)
+    # Either build from the source TSVs, or load a pre-built dataset dir
+    # (save_dataset output — lets the small dataset travel to the GPU host).
+    ap.add_argument("--dataset-dir", default=None, help="load a pre-built dataset (skips TSVs)")
+    ap.add_argument("--memberships", default=None)
+    ap.add_argument("--p279", default=None)
     ap.add_argument("--root", default="Q48352")
-    ap.add_argument("--granularity", choices=["year", "event"], default="year")
+    ap.add_argument("--granularity", choices=["year", "event"], default="event")
     ap.add_argument("--min-holders", type=int, default=0)
     ap.add_argument("--min-year", type=int, default=None)
     ap.add_argument("--max-year", type=int, default=None)
@@ -46,10 +49,15 @@ def main() -> None:
     ap.add_argument("--out", default="results/slice")
     args = ap.parse_args()
 
-    ds = build_dataset(args.memberships, args.p279, WikidataConfig(
-        granularity=args.granularity, root=args.root, min_holders=args.min_holders,
-        min_year=args.min_year, max_year=args.max_year,
-    ))
+    if args.dataset_dir:
+        ds = load_dataset(args.dataset_dir)
+    elif args.memberships and args.p279:
+        ds = build_dataset(args.memberships, args.p279, WikidataConfig(
+            granularity=args.granularity, root=args.root, min_holders=args.min_holders,
+            min_year=args.min_year, max_year=args.max_year,
+        ))
+    else:
+        ap.error("provide --dataset-dir or both --memberships and --p279")
     print("dataset:", json.dumps(ds.stats))
 
     cfg = SliceTrainConfig(

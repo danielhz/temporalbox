@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from ltel_box.wikidata import (
-    WikidataConfig, build_dataset, save_dataset, _qid, _year,
+    WikidataConfig, build_dataset, save_dataset, load_dataset, _qid, _year,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "wikidata"
@@ -68,6 +68,18 @@ def test_save_roundtrip(tmp_path):
         assert (tmp_path / fn).exists()
     lines = (tmp_path / "tbox.tsv").read_text().splitlines()
     assert lines[0] == "child\tparent" and len(lines) == 1 + len(ds.tbox.nf_gcis)
+
+
+def test_save_load_roundtrip(tmp_path):
+    ds = build_dataset(MEM, P279, WikidataConfig(granularity="year"))
+    save_dataset(ds, tmp_path)
+    ds2 = load_dataset(tmp_path)
+    assert ds2.tbox.concept_names == ds.tbox.concept_names
+    assert {(g.lhs, g.rhs) for g in ds2.tbox.nf_gcis} == {(g.lhs, g.rhs) for g in ds.tbox.nf_gcis}
+    assert ds2.subsumption_closure == ds.subsumption_closure
+    assert set(ds2.individuals) == set(ds.individuals)
+    assert ds2.time_points == ds.time_points
+    assert len(ds2.memberships) == len(ds.memberships)
 
 
 if __name__ == "__main__":  # allow running without pytest
