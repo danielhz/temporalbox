@@ -85,14 +85,23 @@ def compute_el_closure(tbox: NormalFormTBox) -> frozenset[tuple[str, str]]:
                         succ_c[g.role].add(g.rhs)
                         changed = True
 
-            # R3 continuation: ∃r.D ⊑ E — if c ⊑ ∃r.D and D ⊑ B and ∃r.B ⊑ E
-            for role, fillers in succ_c.items():
+            # R3 continuation (CR4): ∃r.D ⊑ E — if c ⊑ ∃r.D and D ⊑ B and ∃r.B ⊑ E
+            for role, fillers in list(succ_c.items()):
                 for filler in list(fillers):
                     # Propagate filler subsumptions to new fillers (via sub[filler])
                     for filler_super in list(sub.get(filler, set())):
                         for E in nf4_index.get((role, filler_super), []):
                             if E not in sub_c:
                                 sub_c.add(E)
+                                changed = True
+
+            # CR5 (role composition): c ⊑ ∃r.D, D ⊑ ∃s.E, r∘s⊑t ⇒ c ⊑ ∃t.E
+            for (r1, r2), ts in nf5_index.items():
+                for d in list(succ_c.get(r1, ())):
+                    for e in list(role_succs[d].get(r2, ())):
+                        for t in ts:
+                            if e not in succ_c[t]:
+                                succ_c[t].add(e)
                                 changed = True
 
     pairs: set[tuple[str, str]] = set()

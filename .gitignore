@@ -18,3 +18,4 @@ data/wikidata/offices/
 data/wikidata/dataset*/
 *.nt.gz
 local.mk
+scripts/oracle/tools/
