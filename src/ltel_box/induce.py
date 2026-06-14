@@ -80,3 +80,37 @@ def rq1_metrics(
         "completeness": recovered / n_entailed if n_entailed else float("nan"),
         "spurious_rate": spurious / n_negative if n_negative else float("nan"),
     }
+
+
+def across_seed_metrics(
+    held_per_seed: list[set[tuple[str, str, int]]],
+    entailed: set[tuple[str, str, int]],
+    vocab: Vocabulary,
+    n_positions: int,
+) -> dict[str, float]:
+    """Across-seed aggregates for the faithfulness theorem's universal quantifier.
+
+    `T ⊨ C⊑D` iff *every* zero-loss model satisfies it; the empirical proxy is
+    the intersection of held pairs over all trained seeds. The intersection's
+    spurious rate should be far below any single seed's (different models
+    overcommit on different pairs), approximating the entailment closure.
+    Also reports the union (any seed) as the optimistic bound.
+    """
+    if not held_per_seed:
+        return {}
+    names = [c for i, c in enumerate(vocab.id_to_concept) if i != vocab.top_id]
+    universe = len(names) * (len(names) - 1) * n_positions
+    n_negative = universe - len(entailed)
+
+    inter = set.intersection(*held_per_seed)
+    union = set.union(*held_per_seed)
+    return {
+        "seeds": len(held_per_seed),
+        "entailed": len(entailed),
+        "intersection_held": len(inter),
+        "intersection_recovered": len(inter & entailed),
+        "intersection_spurious": len(inter - entailed),
+        "intersection_completeness": len(inter & entailed) / len(entailed) if entailed else float("nan"),
+        "intersection_spurious_rate": len(inter - entailed) / n_negative if n_negative else float("nan"),
+        "union_spurious_rate": len(union - entailed) / n_negative if n_negative else float("nan"),
+    }

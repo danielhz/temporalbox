@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from ltel_box.induce import held_subsumptions, rq1_metrics          # noqa: E402
+from ltel_box.induce import across_seed_metrics, held_subsumptions, rq1_metrics  # noqa: E402
 from ltel_box.logging_utils import ExperimentLogger                 # noqa: E402
 from ltel_box.oracle import temporal_closure                        # noqa: E402
 from ltel_box.ontology import Vocabulary                            # noqa: E402
@@ -29,52 +29,69 @@ from ltel_box.synthetic import SyntheticConfig, generate_tbox       # noqa: E402
 from ltel_box.trainer import TrainConfig, train                     # noqa: E402
 
 
-def run_one(seed: int, args: argparse.Namespace, outdir: Path) -> dict:
+def run_tbox(data_seed: int, args: argparse.Namespace, outdir: Path) -> dict:
+    """One TBox (data_seed), trained from `args.init_seeds` random inits.
+
+    The across-init intersection of held subsumptions is the empirical proxy
+    for "satisfied in every zero-loss model" (the universal quantifier in the
+    entailment-phrased faithfulness theorem).
+    """
     def scaled(x: int) -> int:
         return max(0, round(x * args.gci_scale))
 
-    # Defaults scaled down from SyntheticConfig: dense random TBoxes over few
-    # concepts saturate the closure (everything ⊑ everything), which is both
-    # unrealistic and degenerate for the spurious-rate denominator.
+    # Dense random TBoxes over few concepts saturate the closure; scale down.
     syn = SyntheticConfig(
         n_concepts=args.n_concepts,
         n_roles=args.n_roles,
         n_nf1=scaled(15), n_nf2=scaled(8), n_nf3=scaled(8), n_nf4=scaled(8),
         n_nf5=scaled(2), n_nf6=scaled(5), n_nf7=scaled(4),
         n_nf10=scaled(3), n_nf12=scaled(2), n_nf13=scaled(2),
-        seed=seed,
+        seed=data_seed,
     )
     ds = generate_tbox(syn)
     entailed = temporal_closure(ds.tbox, args.k, args.loop)
     vocab = Vocabulary.from_tbox(ds.tbox)
+    npos = args.k + 1
 
-    cfg = TrainConfig(
-        dim=args.dim, k=args.k, loop=args.loop,
-        lr=args.lr, epochs=args.epochs, seed=seed, device=args.device,
-    )
-    run_cfg = {"seed": seed, "rq": "rq1", **vars(args)}
-    run_cfg.pop("out", None)
-    logger = ExperimentLogger.from_config(run_cfg, results_dir=outdir)
-    model, final_losses = train(ds.tbox, vocab, cfg, logger)
+    held_per_init: list[set] = []
+    per_init: list[dict] = []
+    for init in range(args.init_seeds):
+        cfg = TrainConfig(
+            dim=args.dim, k=args.k, loop=args.loop,
+            lr=args.lr, epochs=args.epochs, seed=init, device=args.device,
+        )
+        run_cfg = {"data_seed": data_seed, "init_seed": init, "rq": "rq1", **vars(args)}
+        run_cfg.pop("out", None)
+        logger = ExperimentLogger.from_config(run_cfg, results_dir=outdir)
+        model, final_losses = train(ds.tbox, vocab, cfg, logger)
+        held = held_subsumptions(model, vocab, eps=args.eps)
+        m = rq1_metrics(held, entailed, vocab, n_positions=npos)
+        held_per_init.append(held)
+        per_init.append({**final_losses, **m, "init": init})
+        logger.log_eval("rq1", {**final_losses, **m, "data_seed": data_seed, "init": init})
+        logger.close()
 
-    held = held_subsumptions(model, vocab, eps=args.eps)
-    metrics = rq1_metrics(held, entailed, vocab, n_positions=args.k + 1)
-    # tolerance sweep: how much recovery sits just outside the primary eps
-    sweep = {}
-    for e in (1e-3, 1e-2):
-        h = held_subsumptions(model, vocab, eps=e)
-        m = rq1_metrics(h, entailed, vocab, n_positions=args.k + 1)
-        sweep[f"completeness@{e:g}"] = m["completeness"]
-        sweep[f"spurious_rate@{e:g}"] = m["spurious_rate"]
-    record = {**final_losses, **metrics, **sweep, "eps": args.eps, "seed": seed}
-    logger.log_eval("rq1", record)
-    logger.close()
-    return record
+    inter = across_seed_metrics(held_per_init, entailed, vocab, n_positions=npos)
+    n = len(per_init)
+    return {
+        "data_seed": data_seed,
+        "entailed": len(entailed),
+        "mean_loss": sum(r["loss_total"] for r in per_init) / n,
+        "mean_completeness": sum(r["completeness"] for r in per_init) / n,
+        "mean_spurious_rate": sum(r["spurious_rate"] for r in per_init) / n,
+        "max_spurious_rate": max(r["spurious_rate"] for r in per_init),
+        "intersection_completeness": inter["intersection_completeness"],
+        "intersection_spurious_rate": inter["intersection_spurious_rate"],
+        "per_init": per_init,
+    }
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
+    ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2],
+                    help="data seeds (each generates one TBox)")
+    ap.add_argument("--init-seeds", type=int, default=3,
+                    help="model initializations per TBox (intersected for the universal-quantifier proxy)")
     ap.add_argument("--n-concepts", type=int, default=30)
     ap.add_argument("--n-roles", type=int, default=3)
     ap.add_argument("--gci-scale", type=float, default=0.6,
@@ -94,26 +111,31 @@ def main() -> None:
 
     rows = []
     for seed in args.seeds:
-        r = run_one(seed, args, outdir)
+        r = run_tbox(seed, args, outdir)
         rows.append(r)
         print(
-            f"seed={seed}  loss={r['loss_total']:.2e}  "
-            f"entailed={r['entailed']}  completeness={r['completeness']:.3f}  "
-            f"spurious_rate={r['spurious_rate']:.4f}"
+            f"tbox={seed}  loss={r['mean_loss']:.2e}  entailed={r['entailed']}  "
+            f"compl(mean)={r['mean_completeness']:.3f}  "
+            f"spurious(mean)={r['mean_spurious_rate']:.4f} "
+            f"(max {r['max_spurious_rate']:.4f})  "
+            f"∩-spurious={r['intersection_spurious_rate']:.4f}  "
+            f"∩-compl={r['intersection_completeness']:.3f}"
         )
 
     n = len(rows)
     summary = {
         "config": vars(args),
         "runs": rows,
-        "mean_completeness": sum(r["completeness"] for r in rows) / n,
-        "mean_spurious_rate": sum(r["spurious_rate"] for r in rows) / n,
-        "mean_final_loss": sum(r["loss_total"] for r in rows) / n,
+        "mean_completeness": sum(r["mean_completeness"] for r in rows) / n,
+        "mean_spurious_rate": sum(r["mean_spurious_rate"] for r in rows) / n,
+        "mean_intersection_spurious_rate": sum(r["intersection_spurious_rate"] for r in rows) / n,
+        "mean_intersection_completeness": sum(r["intersection_completeness"] for r in rows) / n,
+        "mean_final_loss": sum(r["mean_loss"] for r in rows) / n,
     }
     (outdir / "summary.json").write_text(json.dumps(summary, indent=2))
-    print(f"\nmean completeness {summary['mean_completeness']:.3f}, "
-          f"mean spurious rate {summary['mean_spurious_rate']:.4f}, "
-          f"mean final loss {summary['mean_final_loss']:.2e}")
+    print(f"\nmean completeness {summary['mean_completeness']:.3f}  |  "
+          f"per-seed-model spurious {summary['mean_spurious_rate']:.4f}  ->  "
+          f"across-init intersection spurious {summary['mean_intersection_spurious_rate']:.4f}")
     print(f"summary -> {outdir}/summary.json")
 
 
