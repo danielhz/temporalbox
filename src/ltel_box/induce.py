@@ -82,6 +82,64 @@ def rq1_metrics(
     }
 
 
+@torch.no_grad()
+def ranking_metrics(
+    scorer: BoxScorer,
+    vocab: Vocabulary,
+    entailed: set[tuple[str, str, int]],
+    chunk: int = 256,
+) -> dict[str, float]:
+    """Secondary KG-style ranking (§5): for each entailed (A,B,t), rank the
+    true superconcept B among all candidate concepts by the A⊑·@t containment
+    violation (lower = better); report MRR and Hits@{1,3,10}.
+
+    Filtered ranking: other *entailed* superconcepts of A@t are removed from the
+    candidate list before ranking B (standard filtered protocol)."""
+    n, T = scorer.n_concepts, scorer.n_positions
+    top = vocab.top_id
+    names = vocab.id_to_concept
+    # group entailed superconcepts by (A, t) for filtering
+    sup_by: dict[tuple[str, int], set[str]] = {}
+    for a, b, t in entailed:
+        sup_by.setdefault((a, t), set()).add(b)
+
+    ranks: list[int] = []
+    dev = next(scorer.parameters()).device if hasattr(scorer, "parameters") else None
+    ids = torch.arange(n, device=dev)
+    # precompute per-tick boxes
+    for t in range(T):
+        ts = torch.full((n,), t, dtype=torch.long, device=dev)
+        c, o = scorer.concept_box(ids, ts)
+        lb, ub = c - o, c + o
+        queries = [(a, b) for (a, b, tt) in entailed if tt == t]
+        for a, b in queries:
+            ai = vocab.concept_to_id[a]
+            bi = vocab.concept_to_id[b]
+            # violation of A ⊆ candidate for every candidate, at tick t
+            viol = (torch.relu(lb - lb[ai]) + torch.relu(ub[ai] - ub)).sum(-1)
+            v_true = viol[bi]
+            # filtered: ignore ⊤, A itself, and other entailed supers of (a,t)
+            ignore = {top, ai} | {vocab.concept_to_id[s] for s in sup_by.get((a, t), ()) if s != b}
+            better = 0
+            for j in range(n):
+                if j in ignore or j == bi:
+                    continue
+                if viol[j] < v_true or (viol[j] == v_true and j < bi):
+                    better += 1
+            ranks.append(better + 1)
+
+    if not ranks:
+        return {"mrr": float("nan"), "hits1": float("nan"),
+                "hits3": float("nan"), "hits10": float("nan")}
+    rt = torch.tensor(ranks, dtype=torch.float)
+    return {
+        "mrr": float((1.0 / rt).mean()),
+        "hits1": float((rt <= 1).float().mean()),
+        "hits3": float((rt <= 3).float().mean()),
+        "hits10": float((rt <= 10).float().mean()),
+    }
+
+
 def across_seed_metrics(
     held_per_seed: list[set[tuple[str, str, int]]],
     entailed: set[tuple[str, str, int]],
