@@ -73,7 +73,15 @@ class BoxScorer(Protocol):
 # ── Option A model ───────────────────────────────────────────────────────────
 
 class TemporalBoxModel(nn.Module):
-    """Per-time-point boxes: centers/offsets of shape [n_concepts, k+1, d]."""
+    """Per-time-point boxes: centers/offsets of shape [n_concepts, k+1, d].
+
+    Rigid-box collapse (optional): concepts in `rigid_ids` share ONE box across
+    all ticks (their box is read at position 0 regardless of the requested
+    tick), realising the time-invariance of rigid concepts. Their per-tick
+    positions 1..k become tied (no free parameters), so `free_param_count()`
+    drops toward static-BoxEL cost as the rigid fraction → 1 — the empirical
+    echo of the tractability theorem. With `rigid_ids=None` (default) behaviour
+    is unchanged (all concepts per-time)."""
 
     def __init__(
         self,
@@ -84,6 +92,7 @@ class TemporalBoxModel(nn.Module):
         dim: int,
         top_id: int = 0,
         n_individuals: int = 0,
+        rigid_ids: set[int] | None = None,
         seed: int | None = None,
     ) -> None:
         super().__init__()
@@ -108,13 +117,35 @@ class TemporalBoxModel(nn.Module):
         if n_individuals > 0:
             self.points = nn.Parameter(torch.rand(n_individuals, dim))
 
+        rigid = torch.zeros(n_concepts, dtype=torch.bool)
+        if rigid_ids:
+            rigid[list(rigid_ids)] = True
+        self.register_buffer("rigid_mask", rigid)
+        self.n_rigid = int(rigid.sum())
+
+    def _eff_pos(self, concept_ids: Tensor, positions: Tensor) -> Tensor:
+        # rigid concepts always read their position-0 box (time-invariant)
+        return torch.where(self.rigid_mask[concept_ids], torch.zeros_like(positions), positions)
+
     def concept_box(self, concept_ids: Tensor, positions: Tensor) -> tuple[Tensor, Tensor]:
-        c = self.centers[concept_ids, positions]
-        o = F.softplus(self.offsets_raw[concept_ids, positions])
+        pos = self._eff_pos(concept_ids, positions)
+        c = self.centers[concept_ids, pos]
+        o = F.softplus(self.offsets_raw[concept_ids, pos])
         is_top = (concept_ids == self.top_id).unsqueeze(-1)
         c = torch.where(is_top, torch.zeros_like(c), c)
         o = torch.where(is_top, torch.full_like(o, TOP_EXTENT), o)
         return c, o
+
+    def free_param_count(self) -> int:
+        """Free parameters: rigid concepts contribute 1 box (not k+1). Tied
+        rigid positions and dead params are excluded; this is the model-size
+        measure the tractability claim is about (a ragged store realises it
+        physically)."""
+        n_nonrigid = self.n_concepts - self.n_rigid
+        box_params = (n_nonrigid * self.n_positions + self.n_rigid) * self.dim * 2
+        roles = self.role_emb.numel()
+        pts = self.points.numel() if hasattr(self, "points") else 0
+        return int(box_params + roles + pts)
 
     def role_delta(self, role_ids: Tensor) -> Tensor:
         return self.role_emb[role_ids]

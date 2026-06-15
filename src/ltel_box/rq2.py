@@ -237,11 +237,23 @@ def train_rq2(ds: RQ2Dataset, cfg: RQ2TrainConfig, model_cls=TemporalBoxModel):
     torch.manual_seed(cfg.seed)
     dev = cfg.device
     comp = compile_tbox(ds.tbox, ds.vocab, ds.k, ds.loop, dev)
-    model = model_cls(
-        n_concepts=ds.vocab.n_concepts, n_roles=max(ds.vocab.n_roles, 1),
-        k=ds.k, loop=ds.loop, dim=cfg.dim, top_id=ds.vocab.top_id,
-        n_individuals=len(ds.individuals), seed=cfg.seed,
-    ).to(dev)
+    # rigid-box collapse: tie rigid concepts' boxes across ticks (free-param
+    # saving; A collapses to static BoxEL at ρ=1). Only models that accept
+    # rigid_ids use it; others ignore the kwarg.
+    rigid_ids = {ds.vocab.concept_to_id[c] for c in ds.rigid_concepts
+                 if c in ds.vocab.concept_to_id}
+    try:
+        model = model_cls(
+            n_concepts=ds.vocab.n_concepts, n_roles=max(ds.vocab.n_roles, 1),
+            k=ds.k, loop=ds.loop, dim=cfg.dim, top_id=ds.vocab.top_id,
+            n_individuals=len(ds.individuals), rigid_ids=rigid_ids, seed=cfg.seed,
+        ).to(dev)
+    except TypeError:
+        model = model_cls(
+            n_concepts=ds.vocab.n_concepts, n_roles=max(ds.vocab.n_roles, 1),
+            k=ds.k, loop=ds.loop, dim=cfg.dim, top_id=ds.vocab.top_id,
+            n_individuals=len(ds.individuals), seed=cfg.seed,
+        ).to(dev)
 
     pos = torch.tensor(ds.pos_triples, dtype=torch.long, device=dev)
     neg = torch.tensor(ds.neg_triples, dtype=torch.long, device=dev) if ds.neg_triples else None
@@ -277,7 +289,12 @@ def train_rq2(ds: RQ2Dataset, cfg: RQ2TrainConfig, model_cls=TemporalBoxModel):
     # cost panel (RQ2 §5: "the same runs report parameter count and training
     # time"). A's per-time-point boxes scale with the horizon; B is constant in
     # the horizon — the trade-off against the recovery contrast.
-    comps["param_count"] = int(sum(p.numel() for p in model.parameters()))
+    # report FREE parameters (rigid concepts tie their per-tick boxes): for A
+    # this drops toward static-BoxEL cost as ρ→1; B has no per-tick boxes.
+    comps["param_count"] = int(
+        model.free_param_count() if hasattr(model, "free_param_count")
+        else sum(p.numel() for p in model.parameters())
+    )
     comps["train_time_s"] = train_time_s
     return model, comps
 
