@@ -121,3 +121,73 @@ class TemporalBoxModel(nn.Module):
 
     def individual_point(self, individual_ids: Tensor) -> Tensor:
         return self.points[individual_ids]
+
+
+class TimeAugmentedBoxModel(nn.Module):
+    """Option B comparator (RQ2): one box per concept augmented with a single
+    learned time interval [τ−ω, τ+ω] (the "extra time axis").
+
+    Same BoxScorer surface as Option A, so it drops into the harness. The box
+    "at position t" is the spatial box whose offset is smoothly gated to ~0 as
+    t leaves the concept's time interval:
+
+        offset(t) = spatial_offset · σ(β·(ω − |t − τ|))
+
+    This is the load-bearing limitation B has and A does not: a concept's
+    temporal support is forced CONVEX (one interval), so a concept that is
+    active at non-contiguous ticks (multi-interval / Grover-Cleveland support)
+    cannot be represented — which is what makes recovery decline as the
+    non-rigid, multi-interval fraction grows. Parameter count is independent of
+    the number of ticks (one box + (τ, ω) per concept), unlike A.
+    """
+
+    def __init__(
+        self,
+        n_concepts: int,
+        n_roles: int,
+        k: int,
+        loop: int,
+        dim: int,
+        top_id: int = 0,
+        n_individuals: int = 0,
+        gate_beta: float = 4.0,
+        seed: int | None = None,
+    ) -> None:
+        super().__init__()
+        if seed is not None:
+            torch.manual_seed(seed)
+        self.n_concepts = n_concepts
+        self.n_positions = k + 1
+        self.k = k
+        self.loop = loop
+        self.dim = dim
+        self.top_id = top_id
+        self.n_individuals = n_individuals
+        self.gate_beta = gate_beta
+
+        self.centers = nn.Parameter(torch.rand(n_concepts, dim))
+        self.offsets_raw = nn.Parameter(torch.full((n_concepts, dim), -1.5))
+        # time interval per concept: center τ in [0, k], half-width ω > 0
+        self.time_center = nn.Parameter(torch.rand(n_concepts) * k)
+        self.time_offset_raw = nn.Parameter(torch.full((n_concepts,), 0.0))
+        self.role_emb = nn.Parameter(torch.randn(max(n_roles, 1), dim) * 0.1)
+        if n_individuals > 0:
+            self.points = nn.Parameter(torch.rand(n_individuals, dim))
+
+    def concept_box(self, concept_ids: Tensor, positions: Tensor) -> tuple[Tensor, Tensor]:
+        c = self.centers[concept_ids]
+        o = F.softplus(self.offsets_raw[concept_ids])
+        tau = self.time_center[concept_ids]
+        omega = F.softplus(self.time_offset_raw[concept_ids])
+        gate = torch.sigmoid(self.gate_beta * (omega - (positions.float() - tau).abs()))
+        o = o * gate.unsqueeze(-1)
+        is_top = (concept_ids == self.top_id).unsqueeze(-1)
+        c = torch.where(is_top, torch.zeros_like(c), c)
+        o = torch.where(is_top, torch.full_like(o, TOP_EXTENT), o)
+        return c, o
+
+    def role_delta(self, role_ids: Tensor) -> Tensor:
+        return self.role_emb[role_ids]
+
+    def individual_point(self, individual_ids: Tensor) -> Tensor:
+        return self.points[individual_ids]

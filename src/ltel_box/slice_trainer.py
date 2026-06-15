@@ -32,6 +32,9 @@ from .model import TemporalBoxModel
 from .ontology import Vocabulary
 from .wikidata import WikidataOfficeDataset
 
+# default model factory; RQ2 passes TimeAugmentedBoxModel (Option B) instead.
+DEFAULT_MODEL = TemporalBoxModel
+
 
 @dataclass
 class SliceTrainConfig:
@@ -93,11 +96,12 @@ def train_slice(
     ds: WikidataOfficeDataset,
     cfg: SliceTrainConfig,
     logger: ExperimentLogger | None = None,
-) -> tuple[TemporalBoxModel, SliceTensors, dict[str, float]]:
+    model_cls=DEFAULT_MODEL,
+) -> tuple[torch.nn.Module, SliceTensors, dict[str, float]]:
     torch.manual_seed(cfg.seed)
     st = build_slice_tensors(ds, cfg.device, cfg.membership_cap, cfg.seed)
     k = st.n_ticks - 1
-    model = TemporalBoxModel(
+    model = model_cls(
         n_concepts=st.vocab.n_concepts, n_roles=1, k=k, loop=k, dim=cfg.dim,
         top_id=st.vocab.top_id, n_individuals=len(st.individuals), seed=cfg.seed,
     ).to(cfg.device)
