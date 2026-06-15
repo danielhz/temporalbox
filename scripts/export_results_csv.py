@@ -22,7 +22,7 @@ from pathlib import Path
 def export_rq2(summary: dict, out: Path) -> None:
     # long format: one row per (rho, model)
     cols = ["rho", "model", "recovery", "recovery_L1", "recovery_L2", "recovery_L3",
-            "out_loss", "total_loss"]
+            "out_loss", "total_loss", "param_count", "train_time_s"]
     with out.open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(cols)
@@ -32,7 +32,8 @@ def export_rq2(summary: dict, out: Path) -> None:
                 w.writerow([r["rho"], m,
                             f"{d['recovery']:.4f}", f"{d['recovery_L1']:.4f}",
                             f"{d['recovery_L2']:.4f}", f"{d['recovery_L3']:.4f}",
-                            f"{d['loss_out']:.3e}", f"{d['loss_total']:.3e}"])
+                            f"{d['loss_out']:.3e}", f"{d['loss_total']:.3e}",
+                            int(d.get('param_count', 0)), f"{d.get('train_time_s', 0):.2f}"])
 
 
 def export_rq1(summary: dict, out: Path) -> None:

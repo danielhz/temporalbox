@@ -24,6 +24,7 @@ Both models train through the identical pipeline; only model_cls differs.
 from __future__ import annotations
 
 import random
+import time
 from dataclasses import dataclass, field
 
 import torch
@@ -256,6 +257,7 @@ def train_rq2(ds: RQ2Dataset, cfg: RQ2TrainConfig, model_cls=TemporalBoxModel):
 
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs, eta_min=cfg.lr_min)
+    t0 = time.perf_counter()
     for _ in range(cfg.epochs):
         opt.zero_grad()
         l_tbox = sum(loss_components(model, comp).values())
@@ -265,12 +267,18 @@ def train_rq2(ds: RQ2Dataset, cfg: RQ2TrainConfig, model_cls=TemporalBoxModel):
         total.backward()
         opt.step()
         sched.step()
+    train_time_s = time.perf_counter() - t0
     with torch.no_grad():
         comps = {k: float(v) for k, v in loss_components(model, comp).items()}
         l_in, l_out = mem_losses()
         comps["loss_membership_in"] = float(l_in)
         comps["loss_membership_out"] = float(l_out)
         comps["loss_total"] = sum(comps.values())
+    # cost panel (RQ2 §5: "the same runs report parameter count and training
+    # time"). A's per-time-point boxes scale with the horizon; B is constant in
+    # the horizon — the trade-off against the recovery contrast.
+    comps["param_count"] = int(sum(p.numel() for p in model.parameters()))
+    comps["train_time_s"] = train_time_s
     return model, comps
 
 

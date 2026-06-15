@@ -54,7 +54,8 @@ def main() -> None:
     rows = []
     for rho in args.rhos:
         agg = {m: {"recovery": [], "recovery_L1": [], "recovery_L2": [],
-                   "recovery_L3": [], "loss_out": [], "loss_total": []} for m in MODELS}
+                   "recovery_L3": [], "loss_out": [], "loss_total": [],
+                   "param_count": [], "train_time_s": []} for m in MODELS}
         for seed in args.seeds:
             # controlled = pure ABox: no static/temporal TBox axioms
             ds = generate_rq2(RQ2Config(
@@ -73,6 +74,8 @@ def main() -> None:
                         agg[name][key].append(v)
                 agg[name]["loss_out"].append(comps["loss_membership_out"])
                 agg[name]["loss_total"].append(comps["loss_total"])
+                agg[name]["param_count"].append(comps["param_count"])
+                agg[name]["train_time_s"].append(comps["train_time_s"])
 
         def mean(xs):
             return sum(xs) / len(xs) if xs else float("nan")
