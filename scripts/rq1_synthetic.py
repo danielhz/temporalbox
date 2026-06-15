@@ -25,11 +25,11 @@ from ltel_box.induce import across_seed_metrics, held_subsumptions, rq1_metrics 
 from ltel_box.logging_utils import ExperimentLogger                 # noqa: E402
 from ltel_box.oracle import temporal_closure                        # noqa: E402
 from ltel_box.ontology import Vocabulary                            # noqa: E402
-from ltel_box.model import Box2ELModel, TemporalBoxModel            # noqa: E402
+from ltel_box.model import Box2ELModel, BoxELModel, TemporalBoxModel  # noqa: E402
 from ltel_box.synthetic import SyntheticConfig, generate_tbox       # noqa: E402
 from ltel_box.trainer import TrainConfig, train                     # noqa: E402
 
-_MODELS = {"box2el": Box2ELModel, "translational": TemporalBoxModel}
+_MODELS = {"box2el": Box2ELModel, "boxel": BoxELModel, "translational": TemporalBoxModel}
 
 
 def run_tbox(data_seed: int, args: argparse.Namespace, outdir: Path) -> dict:
@@ -105,7 +105,7 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=2e-2)
     ap.add_argument("--epochs", type=int, default=8000)
     ap.add_argument("--eps", type=float, default=1e-4)
-    ap.add_argument("--model", choices=["box2el", "translational"], default="box2el",
+    ap.add_argument("--model", choices=["box2el", "boxel", "translational"], default="box2el",
                     help="base method: box2el (faithful) or translational (Phase-1)")
     ap.add_argument("--n-nf5", type=int, default=0,
                     help="role-composition (RIA) axioms per TBox; default 0 — box "

@@ -34,6 +34,7 @@ from torch import Tensor
 from .logging_utils import ExperimentLogger
 from .loss import (
     box2el_nf3_loss, box2el_nf4_loss, box2el_nf5_loss,
+    boxel_nf3_loss, boxel_nf4_loss,
     box_contains, box_meet, box_meet_many, nf5_loss,
 )
 from .model import BoxScorer, TemporalBoxModel, between, future, successor
@@ -168,10 +169,13 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
         om = om.clamp_min(0.0)
         out["nf2"] = (box_contains(cm, om, cb, ob) * nonempty.float()).mean()
 
-    # Existentials: Box²EL dual-box + bump path when the model exposes bumps
-    # (the faithful base); otherwise the translational path. Role-free
-    # experiments (slice, RQ2) never reach here.
+    # Existential base method, detected from the scorer's interface:
+    #   Box²EL  — dual Head/Tail boxes + bumps;
+    #   BoxEL   — affine role transform (scale + translation);
+    #   else    — translational (Phase-1).
+    # Role-free experiments (slice, RQ2) never reach here.
     box2el = hasattr(scorer, "bump") and hasattr(scorer, "head_box")
+    boxel = hasattr(scorer, "role_scale") and not box2el
     if comp.nf3 is not None:
         idx = comp.nf3
         cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
@@ -181,17 +185,22 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
             tc, to = scorer.tail_box(idx[:, 1])
             out["nf3"] = box2el_nf3_loss(cC, oC, cD, oD, scorer.bump(idx[:, 0]),
                                          scorer.bump(idx[:, 2]), hc, ho, tc, to).mean()
+        elif boxel:
+            out["nf3"] = boxel_nf3_loss(cC, oC, scorer.role_scale(idx[:, 1]),
+                                        scorer.role_translation(idx[:, 1]), cD, oD).mean()
         else:
             out["nf3"] = box_contains(cC + scorer.role_delta(idx[:, 1]), oC, cD, oD).mean()
     if comp.nf4 is not None:
         idx = comp.nf4   # columns: (filler X, role r, rhs Y, tick)
+        cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
+        cD, oD = scorer.concept_box(idx[:, 2], idx[:, 3])
         if box2el:
             hc, ho = scorer.head_box(idx[:, 1])
-            cY, oY = scorer.concept_box(idx[:, 2], idx[:, 3])
-            out["nf4"] = box2el_nf4_loss(hc, ho, scorer.bump(idx[:, 0]), cY, oY).mean()
+            out["nf4"] = box2el_nf4_loss(hc, ho, scorer.bump(idx[:, 0]), cD, oD).mean()
+        elif boxel:
+            out["nf4"] = boxel_nf4_loss(cC, oC, scorer.role_scale(idx[:, 1]),
+                                        scorer.role_translation(idx[:, 1]), cD, oD).mean()
         else:
-            cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
-            cD, oD = scorer.concept_box(idx[:, 2], idx[:, 3])
             out["nf4"] = box_contains(cC - scorer.role_delta(idx[:, 1]), oC, cD, oD).mean()
 
     if comp.nf5 is not None:

@@ -193,6 +193,77 @@ class Box2ELModel(nn.Module):
         return self.points[individual_ids]
 
 
+class BoxELModel(nn.Module):
+    """Option A on the BoxEL base (Xiong et al., ISWC 2022) — the static method
+    the paper's faithfulness theorem cites and §5 instantiates ("BoxEL
+    throughout").
+
+    Per-time-point concept boxes (non-rigid), plus a RIGID relational layer:
+    each role r is an affine transformation (per-dimension scaling s_r > 0 and
+    translation t_r) — BoxEL's role model, as opposed to Box²EL's dual
+    head/tail boxes + bumps. Existentials transform boxes:
+        NF3  C⊑∃r.D :  f_r(Box(C)) ⊆ Box(D),         f_r(x)=s_r⊙x+t_r
+        NF4  ∃r.C⊑D :  f_r⁻¹(Box(C)) ⊆ Box(D)
+    The concept meet/containment lattice (NF1/NF2) is the shared axisBoxAlgebra.
+
+    NOTE: the exact BoxEL NF3/NF4 affine forms are being confirmed with @prover
+    against Xiong et al. 2022 (same process that corrected the Box²EL NF4
+    Tail→Head). See docs/base-method.md.
+    """
+
+    def __init__(
+        self,
+        n_concepts: int,
+        n_roles: int,
+        k: int,
+        loop: int,
+        dim: int,
+        top_id: int = 0,
+        n_individuals: int = 0,
+        seed: int | None = None,
+    ) -> None:
+        super().__init__()
+        if seed is not None:
+            torch.manual_seed(seed)
+        self.n_concepts = n_concepts
+        self.n_positions = k + 1
+        self.k = k
+        self.loop = loop
+        self.dim = dim
+        self.top_id = top_id
+        self.n_individuals = n_individuals
+
+        self.centers = nn.Parameter(torch.rand(n_concepts, k + 1, dim))
+        self.offsets_raw = nn.Parameter(torch.full((n_concepts, k + 1, dim), -1.5))
+        # rigid affine role transforms: scaling (via softplus, >0) + translation
+        self.role_scale_raw = nn.Parameter(torch.zeros(max(n_roles, 1), dim))  # softplus(0)≈0.69 → ~1 after +offset
+        self.role_trans = nn.Parameter(torch.zeros(max(n_roles, 1), dim))
+        if n_individuals > 0:
+            self.points = nn.Parameter(torch.rand(n_individuals, dim))
+
+    def concept_box(self, concept_ids: Tensor, positions: Tensor) -> tuple[Tensor, Tensor]:
+        c = self.centers[concept_ids, positions]
+        o = F.softplus(self.offsets_raw[concept_ids, positions])
+        is_top = (concept_ids == self.top_id).unsqueeze(-1)
+        c = torch.where(is_top, torch.zeros_like(c), c)
+        o = torch.where(is_top, torch.full_like(o, TOP_EXTENT), o)
+        return c, o
+
+    def role_scale(self, role_ids: Tensor) -> Tensor:
+        # keep scaling strictly positive and ~1 at init
+        return F.softplus(self.role_scale_raw[role_ids]) + 0.5
+
+    def role_translation(self, role_ids: Tensor) -> Tensor:
+        return self.role_trans[role_ids]
+
+    # harness compatibility (unused by the BoxEL affine loss path)
+    def role_delta(self, role_ids: Tensor) -> Tensor:
+        return torch.zeros(role_ids.shape + (self.dim,), device=self.centers.device)
+
+    def individual_point(self, individual_ids: Tensor) -> Tensor:
+        return self.points[individual_ids]
+
+
 class TimeAugmentedBoxModel(nn.Module):
     """Option B comparator (RQ2): one box per concept augmented with a single
     learned time interval [τ−ω, τ+ω] (the "extra time axis").

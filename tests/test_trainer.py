@@ -100,3 +100,19 @@ def test_box2el_base_trains_with_existentials():
     cfg = TrainConfig(dim=16, k=2, loop=1, epochs=600, lr=5e-2, seed=0)
     _, final = train(tb, vocab, cfg, model_cls=Box2ELModel)
     assert final["loss_total"] < 5e-2     # Box²EL path runs and optimizes
+
+
+def test_boxel_base_trains_with_existentials():
+    # The BoxEL affine-transform base must drive a TBox with existentials to
+    # low loss (NF1-NF4; RIAs dropped). Distinct from Box²EL and translational.
+    from ltel_box.model import BoxELModel
+    from ltel_box.ontology import NF1, NF3, NF4, NormalFormTBox, Vocabulary
+
+    tb = NormalFormTBox(
+        frozenset({"A", "B", "C", "D"}), frozenset({"r"}),
+        [NF1("A", "B"), NF3("A", "r", "C"), NF4("r", "C", "D")],
+    )
+    vocab = Vocabulary.from_tbox(tb)
+    cfg = TrainConfig(dim=16, k=2, loop=1, epochs=800, lr=5e-2, seed=0)
+    _, final = train(tb, vocab, cfg, model_cls=BoxELModel)
+    assert final["loss_total"] < 5e-2

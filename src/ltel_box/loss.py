@@ -187,6 +187,29 @@ def box_meet_many(centers: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, Ten
     return center_meet, offset_meet, nonempty
 
 
+# ── BoxEL role/existential losses (affine-transform base) ───────────────────
+# Each role r is an affine map f_r(x) = scale_r ⊙ x + trans_r. A box transforms
+# as center -> scale⊙center + trans, offset -> scale⊙offset.
+
+def boxel_nf3_loss(
+    cC: Tensor, oC: Tensor, scale: Tensor, trans: Tensor, cD: Tensor, oD: Tensor,
+) -> Tensor:
+    """C ⊑ ∃r.D — f_r(Box(C)) ⊆ Box(D) with f_r(x)=scale⊙x+trans.
+
+    INTERIM BoxEL form — exact Xiong-2022 affine convention pending @prover."""
+    return box_contains(scale * cC + trans, scale * oC, cD, oD)
+
+
+def boxel_nf4_loss(
+    cC: Tensor, oC: Tensor, scale: Tensor, trans: Tensor, cD: Tensor, oD: Tensor,
+) -> Tensor:
+    """∃r.C ⊑ D — f_r⁻¹(Box(C)) ⊆ Box(D): the r-predecessors of C are
+    f_r⁻¹(Box(C)) (center=(cC−trans)/scale, offset=oC/scale), forced into Box(D).
+
+    INTERIM BoxEL form — exact Xiong-2022 convention pending @prover."""
+    return box_contains((cC - trans) / scale, oC / scale, cD, oD)
+
+
 # ── Box²EL role/existential losses (faithful base) ──────────────────────────
 # Dual-box + bump construction (Jackermeier et al., WWW 2024); the concept
 # boxes are the per-time boxes, the bumps and Head/Tail boxes are rigid.
