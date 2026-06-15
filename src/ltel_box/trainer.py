@@ -32,7 +32,9 @@ import torch
 from torch import Tensor
 
 from .logging_utils import ExperimentLogger
-from .loss import box_contains, box_meet, box_meet_many, nf5_loss
+from .loss import (
+    box2el_nf3_loss, box2el_nf4_loss, box_contains, box_meet, box_meet_many, nf5_loss,
+)
 from .model import BoxScorer, TemporalBoxModel, between, future, successor
 from .ontology import (
     NF1, NF2, NF3, NF4, NF5, NF6, NF7, NF10, NF12, NF13,
@@ -165,22 +167,47 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
         om = om.clamp_min(0.0)
         out["nf2"] = (box_contains(cm, om, cb, ob) * nonempty.float()).mean()
 
-    for key, sign in (("nf3", 1.0), ("nf4", -1.0)):
-        idx = getattr(comp, key)
-        if idx is None:
-            continue
-        ca, oa = scorer.concept_box(idx[:, 0], idx[:, 3])
-        cb, ob = scorer.concept_box(idx[:, 2], idx[:, 3])
-        delta = scorer.role_delta(idx[:, 1])
-        out[key] = box_contains(ca + sign * delta, oa, cb, ob).mean()
+    # Existentials: Box²EL dual-box + bump path when the model exposes bumps
+    # (the faithful base); otherwise the translational path. Role-free
+    # experiments (slice, RQ2) never reach here.
+    box2el = hasattr(scorer, "bump") and hasattr(scorer, "head_box")
+    if comp.nf3 is not None:
+        idx = comp.nf3
+        cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
+        cD, oD = scorer.concept_box(idx[:, 2], idx[:, 3])
+        if box2el:
+            hc, ho = scorer.head_box(idx[:, 1])
+            tc, to = scorer.tail_box(idx[:, 1])
+            out["nf3"] = box2el_nf3_loss(cC, oC, cD, oD, scorer.bump(idx[:, 0]),
+                                         scorer.bump(idx[:, 2]), hc, ho, tc, to).mean()
+        else:
+            out["nf3"] = box_contains(cC + scorer.role_delta(idx[:, 1]), oC, cD, oD).mean()
+    if comp.nf4 is not None:
+        idx = comp.nf4
+        cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
+        cD, oD = scorer.concept_box(idx[:, 2], idx[:, 3])
+        if box2el:
+            tc, to = scorer.tail_box(idx[:, 1])
+            out["nf4"] = box2el_nf4_loss(cC, oC, cD, oD, scorer.bump(idx[:, 0]), tc, to).mean()
+        else:
+            out["nf4"] = box_contains(cC - scorer.role_delta(idx[:, 1]), oC, cD, oD).mean()
 
     if comp.nf5 is not None:
         idx = comp.nf5
-        out["nf5"] = nf5_loss(
-            scorer.role_delta(idx[:, 0]),
-            scorer.role_delta(idx[:, 1]),
-            scorer.role_delta(idx[:, 2]),
-        ).mean()
+        if box2el:
+            # role composition r∘s⊑t: Head/Tail boxes compose. INTERIM (pending
+            # @prover's exact Box²EL NF5): require t's head/tail to contain the
+            # composed head/tail.
+            h1, ho1 = scorer.head_box(idx[:, 0])
+            h2, ho2 = scorer.head_box(idx[:, 1])
+            ht, hot = scorer.head_box(idx[:, 2])
+            out["nf5"] = box_contains(h1, ho1, ht, hot).mean() + box_contains(h2, ho2, ht, hot).mean()
+        else:
+            out["nf5"] = nf5_loss(
+                scorer.role_delta(idx[:, 0]),
+                scorer.role_delta(idx[:, 1]),
+                scorer.role_delta(idx[:, 2]),
+            ).mean()
 
     nf13_terms = []
     for v_len, idx in comp.nf13.items():
@@ -211,11 +238,14 @@ def train(
     vocab: Vocabulary,
     cfg: TrainConfig,
     logger: ExperimentLogger | None = None,
-) -> tuple[TemporalBoxModel, dict[str, float]]:
-    """Train an Option A model to satisfy the TBox; returns (model, final losses)."""
+    model_cls=TemporalBoxModel,
+) -> tuple[torch.nn.Module, dict[str, float]]:
+    """Train an Option A model to satisfy the TBox; returns (model, final losses).
+    model_cls selects the base method (TemporalBoxModel = translational roles;
+    Box2ELModel = the faithful Box²EL base)."""
     torch.manual_seed(cfg.seed)
     comp = compile_tbox(tbox, vocab, cfg.k, cfg.loop, cfg.device)
-    model = TemporalBoxModel(
+    model = model_cls(
         n_concepts=vocab.n_concepts,
         n_roles=max(vocab.n_roles, 1),
         k=cfg.k,

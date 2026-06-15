@@ -84,3 +84,19 @@ def test_end_to_end_recovery_tiny():
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_box2el_base_trains_with_existentials():
+    # The faithful Box²EL base must drive a TBox with existentials + role
+    # composition to low loss (the Phase-2 base, distinct from translational).
+    from ltel_box.model import Box2ELModel
+    from ltel_box.ontology import NF1, NF3, NF4, NF5, NormalFormTBox, Vocabulary
+
+    tb = NormalFormTBox(
+        frozenset({"A", "B", "C", "D"}), frozenset({"r", "s", "t"}),
+        [NF1("A", "B"), NF3("A", "r", "C"), NF4("r", "C", "D"), NF5("r", "s", "t")],
+    )
+    vocab = Vocabulary.from_tbox(tb)
+    cfg = TrainConfig(dim=16, k=2, loop=1, epochs=600, lr=5e-2, seed=0)
+    _, final = train(tb, vocab, cfg, model_cls=Box2ELModel)
+    assert final["loss_total"] < 5e-2     # Box²EL path runs and optimizes

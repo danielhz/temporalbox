@@ -123,6 +123,76 @@ class TemporalBoxModel(nn.Module):
         return self.points[individual_ids]
 
 
+class Box2ELModel(nn.Module):
+    """Option A on the Box²EL base (Jackermeier et al., WWW 2024) — the faithful
+    static method the paper's theorem and @prover's Lean use.
+
+    Per-time-point concept boxes (non-rigid), plus a RIGID relational layer
+    (Q5 requirement): each concept has a rigid bump vector, each role a rigid
+    Head and Tail box. Existentials use the dual-box + bump scoring; the concept
+    meet/containment lattice (NF1/NF2) is the shared axisBoxAlgebra and uses no
+    bumps. See docs/base-method.md.
+    """
+
+    def __init__(
+        self,
+        n_concepts: int,
+        n_roles: int,
+        k: int,
+        loop: int,
+        dim: int,
+        top_id: int = 0,
+        n_individuals: int = 0,
+        seed: int | None = None,
+    ) -> None:
+        super().__init__()
+        if seed is not None:
+            torch.manual_seed(seed)
+        self.n_concepts = n_concepts
+        self.n_positions = k + 1
+        self.k = k
+        self.loop = loop
+        self.dim = dim
+        self.top_id = top_id
+        self.n_individuals = n_individuals
+
+        self.centers = nn.Parameter(torch.rand(n_concepts, k + 1, dim))
+        self.offsets_raw = nn.Parameter(torch.full((n_concepts, k + 1, dim), -1.5))
+        # rigid relational layer (shared across time)
+        self.bumps = nn.Parameter(torch.randn(n_concepts, dim) * 0.1)
+        self.head_center = nn.Parameter(torch.rand(max(n_roles, 1), dim))
+        self.head_offset_raw = nn.Parameter(torch.full((max(n_roles, 1), dim), -1.0))
+        self.tail_center = nn.Parameter(torch.rand(max(n_roles, 1), dim))
+        self.tail_offset_raw = nn.Parameter(torch.full((max(n_roles, 1), dim), -1.0))
+        if n_individuals > 0:
+            self.points = nn.Parameter(torch.rand(n_individuals, dim))
+
+    def concept_box(self, concept_ids: Tensor, positions: Tensor) -> tuple[Tensor, Tensor]:
+        c = self.centers[concept_ids, positions]
+        o = F.softplus(self.offsets_raw[concept_ids, positions])
+        is_top = (concept_ids == self.top_id).unsqueeze(-1)
+        c = torch.where(is_top, torch.zeros_like(c), c)
+        o = torch.where(is_top, torch.full_like(o, TOP_EXTENT), o)
+        return c, o
+
+    def bump(self, concept_ids: Tensor) -> Tensor:
+        return self.bumps[concept_ids]
+
+    def head_box(self, role_ids: Tensor) -> tuple[Tensor, Tensor]:
+        return self.head_center[role_ids], F.softplus(self.head_offset_raw[role_ids])
+
+    def tail_box(self, role_ids: Tensor) -> tuple[Tensor, Tensor]:
+        return self.tail_center[role_ids], F.softplus(self.tail_offset_raw[role_ids])
+
+    # kept for harness compatibility; Box²EL existentials use the dual boxes,
+    # so role_delta is unused by the Box²EL loss path.
+    def role_delta(self, role_ids: Tensor) -> Tensor:
+        return torch.zeros(role_ids.shape + (self.dim,), device=self.centers.device)
+
+    def individual_point(self, individual_ids: Tensor) -> Tensor:
+        return self.points[individual_ids]
+
+
 class TimeAugmentedBoxModel(nn.Module):
     """Option B comparator (RQ2): one box per concept augmented with a single
     learned time interval [τ−ω, τ+ω] (the "extra time axis").

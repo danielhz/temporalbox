@@ -25,8 +25,11 @@ from ltel_box.induce import across_seed_metrics, held_subsumptions, rq1_metrics 
 from ltel_box.logging_utils import ExperimentLogger                 # noqa: E402
 from ltel_box.oracle import temporal_closure                        # noqa: E402
 from ltel_box.ontology import Vocabulary                            # noqa: E402
+from ltel_box.model import Box2ELModel, TemporalBoxModel            # noqa: E402
 from ltel_box.synthetic import SyntheticConfig, generate_tbox       # noqa: E402
 from ltel_box.trainer import TrainConfig, train                     # noqa: E402
+
+_MODELS = {"box2el": Box2ELModel, "translational": TemporalBoxModel}
 
 
 def run_tbox(data_seed: int, args: argparse.Namespace, outdir: Path) -> dict:
@@ -63,7 +66,7 @@ def run_tbox(data_seed: int, args: argparse.Namespace, outdir: Path) -> dict:
         run_cfg = {"data_seed": data_seed, "init_seed": init, "rq": "rq1", **vars(args)}
         run_cfg.pop("out", None)
         logger = ExperimentLogger.from_config(run_cfg, results_dir=outdir)
-        model, final_losses = train(ds.tbox, vocab, cfg, logger)
+        model, final_losses = train(ds.tbox, vocab, cfg, logger, model_cls=_MODELS[args.model])
         held = held_subsumptions(model, vocab, eps=args.eps)
         m = rq1_metrics(held, entailed, vocab, n_positions=npos)
         held_per_init.append(held)
@@ -102,6 +105,8 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=2e-2)
     ap.add_argument("--epochs", type=int, default=8000)
     ap.add_argument("--eps", type=float, default=1e-4)
+    ap.add_argument("--model", choices=["box2el", "translational"], default="box2el",
+                    help="base method: box2el (faithful) or translational (Phase-1)")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--out", default="results/rq1")
     args = ap.parse_args()

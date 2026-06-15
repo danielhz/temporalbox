@@ -187,6 +187,33 @@ def box_meet_many(centers: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, Ten
     return center_meet, offset_meet, nonempty
 
 
+# ── Box²EL role/existential losses (faithful base) ──────────────────────────
+# Dual-box + bump construction (Jackermeier et al., WWW 2024); the concept
+# boxes are the per-time boxes, the bumps and Head/Tail boxes are rigid.
+
+def box2el_nf3_loss(
+    cC: Tensor, oC: Tensor, cD: Tensor, oD: Tensor,
+    bump_C: Tensor, bump_D: Tensor,
+    head_c: Tensor, head_o: Tensor, tail_c: Tensor, tail_o: Tensor,
+) -> Tensor:
+    """C ⊑ ∃r.D — Box(C)⊕Bump(D) ⊆ Head(r)  and  Box(D)⊕Bump(C) ⊆ Tail(r)."""
+    return (box_contains(cC + bump_D, oC, head_c, head_o)
+            + box_contains(cD + bump_C, oD, tail_c, tail_o))
+
+
+def box2el_nf4_loss(
+    cC: Tensor, oC: Tensor, cD: Tensor, oD: Tensor,
+    bump_C: Tensor,
+    tail_c: Tensor, tail_o: Tensor,
+) -> Tensor:
+    """∃r.C ⊑ D — INTERIM sound-containment encoding (pending @prover's exact
+    Box²EL NF4 from the Lean): the r-tail region carrying C, i.e. Tail(r) shifted
+    back by Bump(C), must lie in Box(D). This is a containment (not an overlap)
+    constraint, so it is sound in direction; the precise Box²EL formula is to be
+    confirmed against `lean/LTEL/`. See docs/base-method.md."""
+    return box_contains(tail_c - bump_C, tail_o, cD, oD)
+
+
 def nf6_loss(
     center_A_t: Tensor, offset_A_t: Tensor,
     center_B_next: Tensor, offset_B_next: Tensor,
