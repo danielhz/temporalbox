@@ -47,7 +47,7 @@ def run_tbox(data_seed: int, args: argparse.Namespace, outdir: Path) -> dict:
         n_concepts=args.n_concepts,
         n_roles=args.n_roles,
         n_nf1=scaled(15), n_nf2=scaled(8), n_nf3=scaled(8), n_nf4=scaled(8),
-        n_nf5=scaled(2), n_nf6=scaled(5), n_nf7=scaled(4),
+        n_nf5=args.n_nf5, n_nf6=scaled(5), n_nf7=scaled(4),
         n_nf10=scaled(3), n_nf12=scaled(2), n_nf13=scaled(2),
         seed=data_seed,
     )
@@ -107,6 +107,10 @@ def main() -> None:
     ap.add_argument("--eps", type=float, default=1e-4)
     ap.add_argument("--model", choices=["box2el", "translational"], default="box2el",
                     help="base method: box2el (faithful) or translational (Phase-1)")
+    ap.add_argument("--n-nf5", type=int, default=0,
+                    help="role-composition (RIA) axioms per TBox; default 0 — box "
+                         "embeddings realise role hierarchy, not composition (per @prover), "
+                         "so RQ1 omits RIAs")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--out", default="results/rq1")
     args = ap.parse_args()

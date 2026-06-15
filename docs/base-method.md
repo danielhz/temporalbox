@@ -40,15 +40,25 @@ each role r has **rigid** Head(r)/Tail(r) boxes. Rigidity of bumps and role
 boxes is required (Q5): non-rigid concept boxes, rigid relational layer. The
 per-normal-form losses (`loss.box2el_*`):
 
-- `NF3  C⊑∃r.D`: `Box(C)⊕Bump(D) ⊆ Head(r)` and `Box(D)⊕Bump(C) ⊆ Tail(r)`. Exact.
-- `NF4  ∃r.X⊑Y`: `Head(r)⊖Bump(X) ⊆ Box(Y)` — sound *containment* (derived from
-  the NF3 head-filling semantics; this is the clause where ELBE was unsound via
-  an *overlap* loss — ours is containment).
-- `NF5  r∘s⊑t`: `Head(r) ⊆ Head(t)` and `Tail(s) ⊆ Tail(t)`. Sound for role
-  *inclusion*; an **over-approximation** for genuine composition — the dual-box
-  bump on the intermediate element does not compose exactly. Full sound role
-  composition with bumps is open; flagged to @prover for confirmation against
-  the Lean. (LTEL synthetic RQ1 uses few NF5 axioms; the slice and RQ2 use none.)
+- `NF3  C⊑∃r.D`: `Box(C)⊕Bump(D) ⊆ Head(r)` and `Box(D)⊕Bump(C) ⊆ Tail(r)`.
+  Exact Box²EL form.
+- `NF4  ∃r.X⊑Y`: `Head(r)⊖Bump(X) ⊆ Box(Y)` — **confirmed by @prover** as the
+  exact Box²EL form (an earlier interim wrongly used Tail; Head is correct
+  because NF4 constrains the r-*predecessors* of X-fillers, which live in
+  `Head(r)⊖Bump(X)`). Sound *containment* (the clause where ELBE was unsound
+  via *overlap*).
+- `NF5  r∘s⊑t` (role composition / RIA): **DROPPED.** @prover confirmed box
+  embeddings realise role *hierarchy*, not composition — head/tail-box inclusion
+  does not imply edge chaining, so any box encoding of `r∘s⊑t` is unsound. RQ1
+  therefore omits RIAs (`scripts/rq1_synthetic.py --n-nf5 0`, the default); the
+  slice and RQ2 are role-free. `loss.box2el_nf5_loss` is retained, marked unsound
+  for composition, and not exercised.
+
+**Verification provenance (important for paper prose):** NF1/NF2 = `axisBoxAlgebra`
+are **machine-checked** in @prover's Lean; the **NF3/NF4 geometry is the Box²EL
+paper's (Thm 2), not machine-checked** — @prover's `t1_soundness` assumes the
+base method's static ∃-soundness as a hypothesis. So RQ1 prose must say NF3/NF4
+are *exact-from-Box²EL*, not "machine-checked."
 
 ## What each experiment rests on — and the faithfulness status of each
 
