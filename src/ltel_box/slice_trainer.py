@@ -156,14 +156,15 @@ def evaluate_slice(
     closure, what fraction hold? Spurious proxy: of sampled non-entailed pairs
     (at a random tick), what fraction the model asserts."""
     g = torch.Generator().manual_seed(seed)
+    dev = next(model.parameters()).device
     cid = st.vocab.concept_to_id
     closure = [(cid[a], cid[b]) for a, b in ds.subsumption_closure
                if a in cid and b in cid]
     n_concepts, T = st.vocab.n_concepts, st.n_ticks
 
     def held(a_ids, b_ids, t_ids) -> torch.Tensor:
-        ca, oa = model.concept_box(a_ids, t_ids)
-        cb, ob = model.concept_box(b_ids, t_ids)
+        ca, oa = model.concept_box(a_ids.to(dev), t_ids.to(dev))
+        cb, ob = model.concept_box(b_ids.to(dev), t_ids.to(dev))
         return box_contains(ca, oa, cb, ob) <= eps
 
     # completeness over sampled closure pairs × sampled ticks
