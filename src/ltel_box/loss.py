@@ -194,19 +194,20 @@ def box_meet_many(centers: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, Ten
 def boxel_nf3_loss(
     cC: Tensor, oC: Tensor, scale: Tensor, trans: Tensor, cD: Tensor, oD: Tensor,
 ) -> Tensor:
-    """C ⊑ ∃r.D — f_r(Box(C)) ⊆ Box(D) with f_r(x)=scale⊙x+trans.
+    """C ⊑ ∃r.D — T_r(Box(C)) ⊆ Box(D), T_r(x)=scale⊙x+trans (diagonal affine).
 
-    INTERIM BoxEL form — exact Xiong-2022 affine convention pending @prover."""
+    Exact Xiong-2022 BoxEL form, @prover-confirmed (geometry is the BoxEL paper's,
+    not machine-checked)."""
     return box_contains(scale * cC + trans, scale * oC, cD, oD)
 
 
 def boxel_nf4_loss(
     cC: Tensor, oC: Tensor, scale: Tensor, trans: Tensor, cD: Tensor, oD: Tensor,
 ) -> Tensor:
-    """∃r.C ⊑ D — f_r⁻¹(Box(C)) ⊆ Box(D): the r-predecessors of C are
-    f_r⁻¹(Box(C)) (center=(cC−trans)/scale, offset=oC/scale), forced into Box(D).
+    """∃r.C ⊑ D — T_r⁻¹(Box(C)) ⊆ Box(D): the r-predecessors of C are
+    T_r⁻¹(Box(C)) (center=(cC−trans)/scale, offset=oC/scale), forced into Box(D).
 
-    INTERIM BoxEL form — exact Xiong-2022 convention pending @prover."""
+    Exact Xiong-2022 BoxEL form, @prover-confirmed. Needs scale>0 for the inverse."""
     return box_contains((cC - trans) / scale, oC / scale, cD, oD)
 
 
