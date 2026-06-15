@@ -167,9 +167,13 @@ class TimeAugmentedBoxModel(nn.Module):
 
         self.centers = nn.Parameter(torch.rand(n_concepts, dim))
         self.offsets_raw = nn.Parameter(torch.full((n_concepts, dim), -1.5))
-        # time interval per concept: center τ in [0, k], half-width ω > 0
-        self.time_center = nn.Parameter(torch.rand(n_concepts) * k)
-        self.time_offset_raw = nn.Parameter(torch.full((n_concepts,), 0.0))
+        # time interval per concept: center τ ≈ k/2, half-width ω initialised
+        # WIDE (covers the whole lasso) so B starts as static BoxEL — gates open.
+        # It then only needs to NARROW for non-rigid support; convex support
+        # (rigid / single-interval) stays cheap, which is what makes B tie A at
+        # ρ=1 (guardrail) while still failing to carve non-convex support.
+        self.time_center = nn.Parameter(torch.full((n_concepts,), k / 2.0))
+        self.time_offset_raw = nn.Parameter(torch.full((n_concepts,), float(k)))
         self.role_emb = nn.Parameter(torch.randn(max(n_roles, 1), dim) * 0.1)
         if n_individuals > 0:
             self.points = nn.Parameter(torch.rand(n_individuals, dim))

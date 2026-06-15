@@ -60,6 +60,25 @@ def point_in_box_loss(
     return F.relu((point - center).abs() - offset).sum(dim=-1)
 
 
+def point_outside_box_loss(
+    point: Tensor,
+    center: Tensor,
+    offset: Tensor,
+    margin: float = 0.0,
+) -> Tensor:
+    """Penalty for `point` lying inside the box (0 when outside by `margin`).
+
+    Closed-world ABox term: at a time point where an individual is NOT a member
+    of a concept, its point must lie OUTSIDE that concept's box. A point is
+    outside iff some coordinate exceeds the box; we penalise the least-violated
+    coordinate. This is what forces a concept's temporal support to be
+    faithful — and what Option B's single convex time interval cannot honour
+    when the true support is non-convex (it must keep the box open across the
+    gap, trapping the points it should exclude). Shape (...,).
+    """
+    return F.relu((offset - (point - center).abs()).min(dim=-1).values + margin)
+
+
 def box_meet(
     center_a: Tensor,
     offset_a: Tensor,

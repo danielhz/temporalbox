@@ -49,7 +49,7 @@ def test_b_shares_box_across_ticks_spatially():
 def test_a_and_b_both_train_via_same_harness():
     # Smoke: both models expose concept_box and train under the shared loss.
     from ltel_box.ontology import NF1, NormalFormTBox, Vocabulary
-    from ltel_box.trainer import TrainConfig, compile_tbox, loss_components
+    from ltel_box.trainer import compile_tbox, loss_components
 
     tb = NormalFormTBox(frozenset({"A", "B"}), frozenset(), [NF1("A", "B")])
     vocab = Vocabulary.from_tbox(tb)
