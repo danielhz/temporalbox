@@ -247,13 +247,13 @@ def box2el_nf5_loss(
 ) -> Tensor:
     """r ∘ s ⊑ t — Head(r) ⊆ Head(t) and Tail(s) ⊆ Tail(t).
 
-    WARNING — UNSOUND for role *composition*. @prover confirmed (2026-06-15):
-    head/tail-box inclusion captures role *hierarchy* (r ⊑ s), NOT edge
-    composition (r(x,y) ∧ s(y,z) → t(x,z)); box embeddings do not realise RIAs.
-    Therefore RQ1 DROPS role-composition axioms (`--n-nf5 0`, the default) and
-    the paper notes RQ1 omits RIAs. This function is retained only for the
-    role-*hierarchy* case; do NOT use it to claim composition support.
-    See docs/base-method.md."""
+    Exact Box²EL form (their NF7 loss), confirmed sound by @prover
+    (2026-06-15, after correcting an earlier mistaken "drop it" note): the
+    composed chain inherits r's source side (Head) and s's target side (Tail),
+    so `Head(r)⊆Head(t) ∧ Tail(s)⊆Tail(t)` realises `r∘s⊑t` (Box²EL Thm 2).
+    Box embeddings DO support role composition. (Role *hierarchy* r⊑s is the
+    related NF6: `Head(r)⊆Head(s) ∧ Tail(r)⊆Tail(s)`.) Geometry is the Box²EL
+    paper's, not machine-checked in the Lean. See docs/base-method.md."""
     return (box_contains(head_r_c, head_r_o, head_t_c, head_t_o)
             + box_contains(tail_s_c, tail_s_o, tail_t_c, tail_t_o))
 

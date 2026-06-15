@@ -107,10 +107,10 @@ def main() -> None:
     ap.add_argument("--eps", type=float, default=1e-4)
     ap.add_argument("--model", choices=["box2el", "boxel", "translational"], default="box2el",
                     help="base method: box2el (faithful) or translational (Phase-1)")
-    ap.add_argument("--n-nf5", type=int, default=0,
-                    help="role-composition (RIA) axioms per TBox; default 0 — box "
-                         "embeddings realise role hierarchy, not composition (per @prover), "
-                         "so RQ1 omits RIAs")
+    ap.add_argument("--n-nf5", type=int, default=2,
+                    help="role-composition (RIA) axioms per TBox. Box²EL supports "
+                         "composition via NF7 (Head(r)⊆Head(t) ∧ Tail(s)⊆Tail(t), "
+                         "@prover-confirmed sound); set 0 to scope RQ1 to NF1–NF4+temporal")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--out", default="results/rq1")
     args = ap.parse_args()

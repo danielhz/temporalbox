@@ -47,12 +47,13 @@ per-normal-form losses (`loss.box2el_*`):
   because NF4 constrains the r-*predecessors* of X-fillers, which live in
   `Head(r)⊖Bump(X)`). Sound *containment* (the clause where ELBE was unsound
   via *overlap*).
-- `NF5  r∘s⊑t` (role composition / RIA): **DROPPED.** @prover confirmed box
-  embeddings realise role *hierarchy*, not composition — head/tail-box inclusion
-  does not imply edge chaining, so any box encoding of `r∘s⊑t` is unsound. RQ1
-  therefore omits RIAs (`scripts/rq1_synthetic.py --n-nf5 0`, the default); the
-  slice and RQ2 are role-free. `loss.box2el_nf5_loss` is retained, marked unsound
-  for composition, and not exercised.
+- `NF5  r∘s⊑t` (role composition / RIA): `Head(r)⊆Head(t) ∧ Tail(s)⊆Tail(t)`
+  — exact Box²EL form (their **NF7** loss), **sound** (Box²EL Thm 2), confirmed
+  by @prover. (Box embeddings **do** support role composition — an earlier
+  @prover note said otherwise and was retracted; do NOT write "box embeddings
+  cannot do RIAs" in the paper.) RQ1 includes it (`--n-nf5 2` default). The
+  related role *hierarchy* r⊑s is NF6 (`Head(r)⊆Head(s) ∧ Tail(r)⊆Tail(s)`).
+  Slice and RQ2 are role-free regardless.
 
 **BoxEL base** — `model.BoxELModel` (the method §5 cites, "BoxEL throughout").
 Per-time concept boxes + a **rigid** affine role transform per role
