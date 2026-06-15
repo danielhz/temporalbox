@@ -54,6 +54,16 @@ per-normal-form losses (`loss.box2el_*`):
   slice and RQ2 are role-free. `loss.box2el_nf5_loss` is retained, marked unsound
   for composition, and not exercised.
 
+**BoxEL base** — `model.BoxELModel` (the method §5 cites, "BoxEL throughout").
+Per-time concept boxes + a **rigid** affine role transform per role
+(per-dimension scale `s_r>0` + translation `t_r`); `f_r(x)=s_r⊙x+t_r`:
+- `NF3 C⊑∃r.D`: `f_r(Box(C)) ⊆ Box(D)`.
+- `NF4 ∃r.X⊑Y`: `f_r⁻¹(Box(X)) ⊆ Box(Y)` (predecessors of X under r).
+These are **interim** — the exact Xiong-2022 affine convention is being
+confirmed with @prover (same process that corrected the Box²EL NF4). BoxEL and
+Box²EL are both faithful bases; the lifting is base-agnostic, so RQ1 can report
+either (or both). Slice + RQ2 are role-free → base-independent.
+
 **Verification provenance (important for paper prose):** NF1/NF2 = `axisBoxAlgebra`
 are **machine-checked** in @prover's Lean; the **NF3/NF4 geometry is the Box²EL
 paper's (Thm 2), not machine-checked** — @prover's `t1_soundness` assumes the
