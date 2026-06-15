@@ -202,16 +202,38 @@ def box2el_nf3_loss(
 
 
 def box2el_nf4_loss(
-    cC: Tensor, oC: Tensor, cD: Tensor, oD: Tensor,
-    bump_C: Tensor,
-    tail_c: Tensor, tail_o: Tensor,
+    head_c: Tensor, head_o: Tensor,
+    bump_X: Tensor,
+    cY: Tensor, oY: Tensor,
 ) -> Tensor:
-    """∃r.C ⊑ D — INTERIM sound-containment encoding (pending @prover's exact
-    Box²EL NF4 from the Lean): the r-tail region carrying C, i.e. Tail(r) shifted
-    back by Bump(C), must lie in Box(D). This is a containment (not an overlap)
-    constraint, so it is sound in direction; the precise Box²EL formula is to be
-    confirmed against `lean/LTEL/`. See docs/base-method.md."""
-    return box_contains(tail_c - bump_C, tail_o, cD, oD)
+    """∃r.X ⊑ Y — Head(r) ⊖ Bump(X) ⊆ Box(Y).
+
+    Sound by the Box²EL role semantics: NF3 fills Head(r) with source boxes
+    bumped by the target's bump (`Box(·)⊕Bump(X)⊆Head(r)`), so any a ∈ ∃r.X
+    satisfies a⊕Bump(X) ∈ Head(r), i.e. a ∈ Head(r)⊖Bump(X). Enforcing
+    Head(r)⊖Bump(X) ⊆ Box(Y) therefore forces ∃r.X ⊆ Y. This is a *containment*
+    constraint (unlike ELBE's unsound NF4 overlap)."""
+    return box_contains(head_c - bump_X, head_o, cY, oY)
+
+
+def box2el_nf5_loss(
+    head_r_c: Tensor, head_r_o: Tensor,
+    tail_s_c: Tensor, tail_s_o: Tensor,
+    head_t_c: Tensor, head_t_o: Tensor,
+    tail_t_c: Tensor, tail_t_o: Tensor,
+) -> Tensor:
+    """r ∘ s ⊑ t — Head(r) ⊆ Head(t) and Tail(s) ⊆ Tail(t).
+
+    The composition's source side is governed by the first role r (its Head),
+    its target side by the last role s (its Tail). Requiring r's Head and s's
+    Tail inside t's gives t a relation containing r∘s on each side. This is the
+    standard box role-chain encoding: exact/sound for role *inclusion* (r⊑t);
+    for genuine *composition* it is an over-approximation (the dual-box+bump
+    construction does not compose the intermediate element's bump exactly —
+    a known limitation; full sound role composition with bumps is open).
+    See docs/base-method.md."""
+    return (box_contains(head_r_c, head_r_o, head_t_c, head_t_o)
+            + box_contains(tail_s_c, tail_s_o, tail_t_c, tail_t_o))
 
 
 def nf6_loss(

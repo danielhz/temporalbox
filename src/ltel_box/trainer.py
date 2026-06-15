@@ -33,7 +33,8 @@ from torch import Tensor
 
 from .logging_utils import ExperimentLogger
 from .loss import (
-    box2el_nf3_loss, box2el_nf4_loss, box_contains, box_meet, box_meet_many, nf5_loss,
+    box2el_nf3_loss, box2el_nf4_loss, box2el_nf5_loss,
+    box_contains, box_meet, box_meet_many, nf5_loss,
 )
 from .model import BoxScorer, TemporalBoxModel, between, future, successor
 from .ontology import (
@@ -183,25 +184,24 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
         else:
             out["nf3"] = box_contains(cC + scorer.role_delta(idx[:, 1]), oC, cD, oD).mean()
     if comp.nf4 is not None:
-        idx = comp.nf4
-        cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
-        cD, oD = scorer.concept_box(idx[:, 2], idx[:, 3])
+        idx = comp.nf4   # columns: (filler X, role r, rhs Y, tick)
         if box2el:
-            tc, to = scorer.tail_box(idx[:, 1])
-            out["nf4"] = box2el_nf4_loss(cC, oC, cD, oD, scorer.bump(idx[:, 0]), tc, to).mean()
+            hc, ho = scorer.head_box(idx[:, 1])
+            cY, oY = scorer.concept_box(idx[:, 2], idx[:, 3])
+            out["nf4"] = box2el_nf4_loss(hc, ho, scorer.bump(idx[:, 0]), cY, oY).mean()
         else:
+            cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
+            cD, oD = scorer.concept_box(idx[:, 2], idx[:, 3])
             out["nf4"] = box_contains(cC - scorer.role_delta(idx[:, 1]), oC, cD, oD).mean()
 
     if comp.nf5 is not None:
-        idx = comp.nf5
+        idx = comp.nf5   # columns: (role r, role s, role t)
         if box2el:
-            # role composition r∘s⊑t: Head/Tail boxes compose. INTERIM (pending
-            # @prover's exact Box²EL NF5): require t's head/tail to contain the
-            # composed head/tail.
-            h1, ho1 = scorer.head_box(idx[:, 0])
-            h2, ho2 = scorer.head_box(idx[:, 1])
-            ht, hot = scorer.head_box(idx[:, 2])
-            out["nf5"] = box_contains(h1, ho1, ht, hot).mean() + box_contains(h2, ho2, ht, hot).mean()
+            hr, hro = scorer.head_box(idx[:, 0])
+            ts, tso = scorer.tail_box(idx[:, 1])
+            ht, hto = scorer.head_box(idx[:, 2])
+            tt, tto = scorer.tail_box(idx[:, 2])
+            out["nf5"] = box2el_nf5_loss(hr, hro, ts, tso, ht, hto, tt, tto).mean()
         else:
             out["nf5"] = nf5_loss(
                 scorer.role_delta(idx[:, 0]),

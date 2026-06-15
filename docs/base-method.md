@@ -36,10 +36,19 @@ overclaimed (translational-role faithfulness was not established here).
 **Phase 2 (this change): Box²EL roles** — `model.Box2ELModel`. Per @prover's
 Q5 result, the faithful base for the construction is Box²EL: each concept C has
 a (per-time, possibly non-rigid) box `Box(C)` AND a **rigid** bump `Bump(C)`;
-each role r has **rigid** Head(r)/Tail(r) boxes. Existentials:
-`NF3  Box(C)⊕Bump(D) ⊆ Head(r)` and `Box(D)⊕Bump(C) ⊆ Tail(r)`.
-Rigidity of bumps and role boxes is required (Q5): non-rigid concept boxes,
-rigid relational layer.
+each role r has **rigid** Head(r)/Tail(r) boxes. Rigidity of bumps and role
+boxes is required (Q5): non-rigid concept boxes, rigid relational layer. The
+per-normal-form losses (`loss.box2el_*`):
+
+- `NF3  C⊑∃r.D`: `Box(C)⊕Bump(D) ⊆ Head(r)` and `Box(D)⊕Bump(C) ⊆ Tail(r)`. Exact.
+- `NF4  ∃r.X⊑Y`: `Head(r)⊖Bump(X) ⊆ Box(Y)` — sound *containment* (derived from
+  the NF3 head-filling semantics; this is the clause where ELBE was unsound via
+  an *overlap* loss — ours is containment).
+- `NF5  r∘s⊑t`: `Head(r) ⊆ Head(t)` and `Tail(s) ⊆ Tail(t)`. Sound for role
+  *inclusion*; an **over-approximation** for genuine composition — the dual-box
+  bump on the intermediate element does not compose exactly. Full sound role
+  composition with bumps is open; flagged to @prover for confirmation against
+  the Lean. (LTEL synthetic RQ1 uses few NF5 axioms; the slice and RQ2 use none.)
 
 ## What each experiment rests on — and the faithfulness status of each
 
