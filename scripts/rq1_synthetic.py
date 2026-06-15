@@ -29,7 +29,8 @@ from ltel_box.model import Box2ELModel, BoxELModel, TemporalBoxModel  # noqa: E4
 from ltel_box.synthetic import SyntheticConfig, generate_tbox       # noqa: E402
 from ltel_box.trainer import TrainConfig, train                     # noqa: E402
 
-_MODELS = {"box2el": Box2ELModel, "boxel": BoxELModel, "translational": TemporalBoxModel}
+_MODELS = {"box2el": Box2ELModel, "boxel": BoxELModel,
+           "translational": TemporalBoxModel, "transbox": TemporalBoxModel}
 
 
 def run_tbox(data_seed: int, args: argparse.Namespace, outdir: Path) -> dict:
@@ -105,7 +106,7 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=2e-2)
     ap.add_argument("--epochs", type=int, default=8000)
     ap.add_argument("--eps", type=float, default=1e-4)
-    ap.add_argument("--model", choices=["box2el", "boxel", "translational"], default="box2el",
+    ap.add_argument("--model", choices=["box2el", "boxel", "translational", "transbox"], default="box2el",
                     help="base method: box2el (faithful) or translational (Phase-1)")
     ap.add_argument("--n-nf5", type=int, default=2,
                     help="role-composition (RIA) axioms per TBox. Box²EL supports "
