@@ -275,6 +275,49 @@ def train_rq2(ds: RQ2Dataset, cfg: RQ2TrainConfig, model_cls=TemporalBoxModel):
 
 
 @torch.no_grad()
+def reconstruction_metrics(model, ds: RQ2Dataset, eps: float = 1e-3) -> dict:
+    """Membership-reconstruction recovery — the controlled-experiment metric.
+
+    A faithful temporal interpretation requires each individual's point to lie
+    INSIDE its concept boxes at active ticks and OUTSIDE at inactive ticks.
+    Recovery = fraction of those (individual, concept, tick) facts the trained
+    model gets right, reported overall and by the sub-concept's support level
+    (1 rigid / 2 single-interval / 3 multi-interval). A (per-time-point) should
+    stay ~1.0 at every level; B (one convex interval) should fall on level 3.
+    """
+    dev = next(model.parameters()).device
+    inv = ds.vocab.id_to_concept
+
+    def correct(triples, want_inside: bool):
+        by_lvl = {1: [0, 0], 2: [0, 0], 3: [0, 0]}
+        if not triples:
+            return by_lvl
+        idx = torch.tensor(triples, dtype=torch.long, device=dev)
+        c, o = model.concept_box(idx[:, 1], idx[:, 2])
+        p = model.individual_point(idx[:, 0])
+        viol = torch.relu((p - c).abs() - o).sum(-1)        # 0 ⇔ inside
+        inside = (viol <= eps).tolist()
+        for (_i, cc, _t), ins in zip(triples, inside):
+            lvl = ds.support_level[inv[cc]]
+            by_lvl[lvl][1] += 1
+            by_lvl[lvl][0] += int(ins == want_inside)
+        return by_lvl
+
+    pos = correct(ds.pos_triples, want_inside=True)
+    neg = correct(ds.neg_triples, want_inside=False)
+    out = {}
+    tot_c = tot_n = 0
+    for lvl in (1, 2, 3):
+        c = pos[lvl][0] + neg[lvl][0]
+        n = pos[lvl][1] + neg[lvl][1]
+        tot_c += c
+        tot_n += n
+        out[f"recovery_L{lvl}"] = (c / n) if n else float("nan")
+    out["recovery"] = (tot_c / tot_n) if tot_n else float("nan")
+    return out
+
+
+@torch.no_grad()
 def evaluate_rq2(model, ds: RQ2Dataset, eps: float = 1e-3) -> dict:
     """Subsumption recovery (completeness) overall and by support level of the
     sub-concept. Enumerates the temporal closure (small in synthetic RQ2)."""
