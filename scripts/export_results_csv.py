@@ -68,9 +68,28 @@ def export_slice(summary: dict, out: Path) -> None:
                     f"{r['loss_subsumption']:.3e}", f"{r['loss_membership']:.3e}"])
 
 
+def export_rq1bd(summary: dict, out: Path) -> None:
+    """RQ1 breakdowns -> two CSVs (by operator, by rigid fraction) next to `out`."""
+    metrics = ["loss", "completeness", "spurious_rate", "mrr", "hits1", "hits3", "hits10"]
+    op_path = out.with_name(out.stem + "_by_operator.csv")
+    with op_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["operator"] + metrics)
+        for op, d in summary["by_operator"].items():
+            w.writerow([op] + [f"{d[m]:.4f}" for m in metrics])
+    rho_path = out.with_name(out.stem + "_by_rho.csv")
+    with rho_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["rho"] + metrics)
+        for rho, d in summary["by_rigid_fraction"].items():
+            w.writerow([rho] + [f"{d[m]:.4f}" for m in metrics])
+    print(f"wrote {op_path}")
+    print(f"wrote {rho_path}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--kind", choices=["rq2", "rq1", "slice"], required=True)
+    ap.add_argument("--kind", choices=["rq2", "rq1", "slice", "rq1bd"], required=True)
     ap.add_argument("--in", dest="inp", required=True)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -78,8 +97,10 @@ def main() -> None:
     summary = json.loads(Path(args.inp).read_text())
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    {"rq2": export_rq2, "rq1": export_rq1, "slice": export_slice}[args.kind](summary, out)
-    print(f"wrote {out}")
+    fn = {"rq2": export_rq2, "rq1": export_rq1, "slice": export_slice, "rq1bd": export_rq1bd}[args.kind]
+    fn(summary, out)
+    if args.kind != "rq1bd":
+        print(f"wrote {out}")
 
 
 if __name__ == "__main__":
