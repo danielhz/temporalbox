@@ -35,6 +35,7 @@ from .logging_utils import ExperimentLogger
 from .loss import (
     box2el_nf3_loss, box2el_nf4_loss, box2el_nf5_loss,
     boxel_nf3_loss, boxel_nf4_loss,
+    transbox_nf3_loss, transbox_nf4_loss, transbox_nf5_loss,
     box_contains, box_meet, box_meet_many, nf5_loss,
 )
 from .model import BoxScorer, TemporalBoxModel, between, future, successor
@@ -176,6 +177,7 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
     # Role-free experiments (slice, RQ2) never reach here.
     box2el = hasattr(scorer, "bump") and hasattr(scorer, "head_box")
     boxel = hasattr(scorer, "role_scale") and not box2el
+    transbox = hasattr(scorer, "role_box") and not box2el
     if comp.nf3 is not None:
         idx = comp.nf3
         cC, oC = scorer.concept_box(idx[:, 0], idx[:, 3])
@@ -185,6 +187,9 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
             tc, to = scorer.tail_box(idx[:, 1])
             out["nf3"] = box2el_nf3_loss(cC, oC, cD, oD, scorer.bump(idx[:, 0]),
                                          scorer.bump(idx[:, 2]), hc, ho, tc, to).mean()
+        elif transbox:
+            cr, or_ = scorer.role_box(idx[:, 1])
+            out["nf3"] = transbox_nf3_loss(cC, oC, cr, or_, cD, oD).mean()
         elif boxel:
             out["nf3"] = boxel_nf3_loss(cC, oC, scorer.role_scale(idx[:, 1]),
                                         scorer.role_translation(idx[:, 1]), cD, oD).mean()
@@ -197,6 +202,9 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
         if box2el:
             hc, ho = scorer.head_box(idx[:, 1])
             out["nf4"] = box2el_nf4_loss(hc, ho, scorer.bump(idx[:, 0]), cD, oD).mean()
+        elif transbox:
+            cr, or_ = scorer.role_box(idx[:, 1])
+            out["nf4"] = transbox_nf4_loss(cC, oC, cr, or_, cD, oD).mean()
         elif boxel:
             out["nf4"] = boxel_nf4_loss(cC, oC, scorer.role_scale(idx[:, 1]),
                                         scorer.role_translation(idx[:, 1]), cD, oD).mean()
@@ -211,6 +219,11 @@ def loss_components(scorer: BoxScorer, comp: CompiledTBox) -> dict[str, Tensor]:
             ht, hto = scorer.head_box(idx[:, 2])
             tt, tto = scorer.tail_box(idx[:, 2])
             out["nf5"] = box2el_nf5_loss(hr, hro, ts, tso, ht, hto, tt, tto).mean()
+        elif transbox:
+            cr, or_ = scorer.role_box(idx[:, 0])
+            cs, os_ = scorer.role_box(idx[:, 1])
+            ct, ot = scorer.role_box(idx[:, 2])
+            out["nf5"] = transbox_nf5_loss(cr, or_, cs, os_, ct, ot).mean()
         else:
             out["nf5"] = nf5_loss(
                 scorer.role_delta(idx[:, 0]),

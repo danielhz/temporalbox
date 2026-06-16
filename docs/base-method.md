@@ -22,16 +22,15 @@ not confuse the early translational results with the faithful-base ones.
 
 ## History of this repository's base method
 
-**Phase 1 (initial scaffold, commits up to ~`f39b8dd`): translational roles.**
-Roles were a single translation vector δ_r per role:
-`NF3  Box(A)+δ_r ⊆ Box(B)`, `NF4  Box(A)−δ_r ⊆ Box(B)`, `NF5  δ_r+δ_s = δ_t`.
-The NF1/NF2 concept core was already `axisBoxAlgebra` (the faithful lattice).
-The role encoding is *translational* — closest to TransBox, and NOT BoxEL's
-affine maps nor Box²EL's dual role-boxes + bumps. Note our NF4 used
-**containment** (`Box(A)−δ ⊆ Box(B)`), unlike ELBE's overlap loss, so it is not
-the ELBE non-example; but it was never reconciled against the paper's named
-base method, and "the simplest faithful encoding" comment in early `loss.py`
-overclaimed (translational-role faithfulness was not established here).
+**Phase 1 (initial scaffold, commits up to ~`f39b8dd`): single-translation roles
+(TransE/ELEM-style — NOT TransBox).** Roles were a single translation vector
+δ_r per role: `NF3 Box(A)+δ_r ⊆ Box(B)`, `NF4 Box(A)−δ_r ⊆ Box(B)`,
+`NF5 δ_r+δ_s = δ_t`. The NF1/NF2 concept core was already `axisBoxAlgebra`. NF4
+is a genuine **containment** (sound in direction, unlike ELBE's overlap). Per
+@prover this is **TransE/ELEM-style, NOT TransBox** — TransBox uses translation
+*boxes*, not single vectors (a single vector is the degenerate zero-offset
+case, losing the many-to-many capability). Superseded; available as
+`--model transe`.
 
 **Phase 2 (this change): Box²EL roles** — `model.Box2ELModel`. Per @prover's
 Q5 result, the faithful base for the construction is Box²EL: each concept C has
@@ -54,6 +53,17 @@ per-normal-form losses (`loss.box2el_*`):
   cannot do RIAs" in the paper.) RQ1 includes it (`--n-nf5 2` default). The
   related role *hierarchy* r⊑s is NF6 (`Head(r)⊆Head(s) ∧ Tail(r)⊆Tail(s)`).
   Slice and RQ2 are role-free regardless.
+
+**TransBox base** — `model.TransBoxModel` (Yang et al., WWW 2025; the third
+faithful base). Roles are **translation boxes** `Box(r)=(c_r,o_r)`, r(a,b) iff
+x_a−x_b ∈ Box(r). Per-time concept boxes; rigid role boxes.
+- `NF3 C⊑∃r.D`: `Box(C) ⊆ Box(D)⊕Box(r) = box(c_D+c_r, o_D+o_r)`.
+- `NF4 ∃r.C⊑D`: `Box(C)⊕Box(r) = box(c_C+c_r, o_C+o_r) ⊆ Box(D)`.
+- `NF5 r∘s⊑t`: `Box(r)⊕Box(s) = box(c_r+c_s, o_r+o_s) ⊆ Box(t)` — composition is
+  *closed* for translation boxes (sound RIAs, unlike single-vector TransE).
+Derived from TransBox's relation semantics; exact match to Yang 2025 being
+confirmed with @prover. Faithful (their Thm 5.1). `--model transbox`. Trains to
+loss 0 on NF1–NF5.
 
 **BoxEL base** — `model.BoxELModel` (the method §5 cites, "BoxEL throughout").
 Per-time concept boxes + a **rigid** affine role transform per role

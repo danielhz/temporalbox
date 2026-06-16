@@ -211,6 +211,34 @@ def boxel_nf4_loss(
     return box_contains((cC - trans) / scale, oC / scale, cD, oD)
 
 
+# ── TransBox role/existential losses (translation-box base) ─────────────────
+# Roles are translation boxes Box(r)=(c_r,o_r); the existential is a Minkowski
+# sum of boxes and composition adds centres+offsets (Yang et al. 2025).
+
+def transbox_nf3_loss(
+    cC: Tensor, oC: Tensor, cr: Tensor, or_: Tensor, cD: Tensor, oD: Tensor,
+) -> Tensor:
+    """C ⊑ ∃r.D — Box(C) ⊆ Box(D) ⊕ Box(r) = box(c_D+c_r, o_D+o_r)."""
+    return box_contains(cC, oC, cD + cr, oD + or_)
+
+
+def transbox_nf4_loss(
+    cC: Tensor, oC: Tensor, cr: Tensor, or_: Tensor, cD: Tensor, oD: Tensor,
+) -> Tensor:
+    """∃r.C ⊑ D — Box(C) ⊕ Box(r) = box(c_C+c_r, o_C+o_r) ⊆ Box(D)."""
+    return box_contains(cC + cr, oC + or_, cD, oD)
+
+
+def transbox_nf5_loss(
+    cr: Tensor, or_: Tensor, cs: Tensor, os_: Tensor, ct: Tensor, ot: Tensor,
+) -> Tensor:
+    """r ∘ s ⊑ t — Box(r) ⊕ Box(s) = box(c_r+c_s, o_r+o_s) ⊆ Box(t).
+
+    Composition is closed for translation boxes, so this is a genuine
+    containment (unlike single-vector TransE, where composition can't be a box)."""
+    return box_contains(cr + cs, or_ + os_, ct, ot)
+
+
 # ── Box²EL role/existential losses (faithful base) ──────────────────────────
 # Dual-box + bump construction (Jackermeier et al., WWW 2024); the concept
 # boxes are the per-time boxes, the bumps and Head/Tail boxes are rigid.

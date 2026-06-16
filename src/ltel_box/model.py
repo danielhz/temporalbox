@@ -295,6 +295,76 @@ class BoxELModel(nn.Module):
         return self.points[individual_ids]
 
 
+class TransBoxModel(nn.Module):
+    """Option A on the TransBox base (Yang, Chen, Sattler, WWW 2025) — the third
+    faithful base on @prover's list, alongside BoxEL and Box²EL.
+
+    Roles are **translation boxes**, not single vectors: r(a,b) iff
+    x_a − x_b ∈ Box(r) = (c_r, o_r). The existential is a Minkowski sum of boxes
+    (∃r.D = Box(D) ⊕ Box(r) = box(c_D+c_r, o_D+o_r)), and composition is closed
+    (Box(r∘s) = box(c_r+c_s, o_r+o_s)) — its many-to-many capability is exactly
+    what a single TransE vector lacks. Per-time-point concept boxes; rigid role
+    boxes. NF1/NF2 = the shared axisBoxAlgebra.
+
+    The role losses are derived from TransBox's relation semantics; exact match
+    to Yang 2025 is being confirmed with @prover.
+    """
+
+    def __init__(
+        self,
+        n_concepts: int,
+        n_roles: int,
+        k: int,
+        loop: int,
+        dim: int,
+        top_id: int = 0,
+        n_individuals: int = 0,
+        rigid_ids: set[int] | None = None,
+        seed: int | None = None,
+    ) -> None:
+        super().__init__()
+        if seed is not None:
+            torch.manual_seed(seed)
+        self.n_concepts = n_concepts
+        self.n_positions = k + 1
+        self.k = k
+        self.loop = loop
+        self.dim = dim
+        self.top_id = top_id
+        self.n_individuals = n_individuals
+
+        self.centers = nn.Parameter(torch.rand(n_concepts, k + 1, dim))
+        self.offsets_raw = nn.Parameter(torch.full((n_concepts, k + 1, dim), -1.5))
+        # rigid translation box per role
+        self.role_center = nn.Parameter(torch.randn(max(n_roles, 1), dim) * 0.1)
+        self.role_offset_raw = nn.Parameter(torch.full((max(n_roles, 1), dim), -1.5))
+        if n_individuals > 0:
+            self.points = nn.Parameter(torch.rand(n_individuals, dim))
+        rigid = torch.zeros(n_concepts, dtype=torch.bool)
+        if rigid_ids:
+            rigid[list(rigid_ids)] = True
+        self.register_buffer("rigid_mask", rigid)
+        self.n_rigid = int(rigid.sum())
+
+    def concept_box(self, concept_ids: Tensor, positions: Tensor) -> tuple[Tensor, Tensor]:
+        pos = torch.where(self.rigid_mask[concept_ids], torch.zeros_like(positions), positions)
+        c = self.centers[concept_ids, pos]
+        o = F.softplus(self.offsets_raw[concept_ids, pos])
+        is_top = (concept_ids == self.top_id).unsqueeze(-1)
+        c = torch.where(is_top, torch.zeros_like(c), c)
+        o = torch.where(is_top, torch.full_like(o, TOP_EXTENT), o)
+        return c, o
+
+    def role_box(self, role_ids: Tensor) -> tuple[Tensor, Tensor]:
+        return self.role_center[role_ids], F.softplus(self.role_offset_raw[role_ids])
+
+    def role_delta(self, role_ids: Tensor) -> Tensor:  # harness compat (unused)
+        return torch.zeros(role_ids.shape + (self.dim,), device=self.centers.device)
+
+    def individual_point(self, individual_ids: Tensor) -> Tensor:
+        return self.points[individual_ids]
+
+
 class TimeAugmentedBoxModel(nn.Module):
     """Option B comparator (RQ2): one box per concept augmented with a single
     learned time interval [τ−ω, τ+ω] (the "extra time axis").
