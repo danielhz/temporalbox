@@ -12,6 +12,7 @@ tables are committed as the deliverable).
 | File | Experiment | Status |
 |---|---|---|
 | `slice.csv` | Offices feasibility slice (§5) | **final** — role-free, on the faithful core |
+| `slice_stats.csv` | Offices-slice dataset statistics (scale/hierarchy/temporal/density) for the appendix table | **final** (long format: group, stat, value) |
 | `rq2_multi.csv` | RQ2 A-vs-B, non-rigid = multi-interval (headline) | **final** — A flat 1.0; B's L1 (rigid)=1.0 but L3 (multi-interval)≈0.85; B ties A at ρ=1 |
 | `rq2_single.csv` | RQ2 A-vs-B, non-rigid = single-interval | **final** — note: per-membership single intervals still aggregate to non-convex *concept-level* support across individuals, so B also declines here (less steeply); the clean convex control is ρ=1 + the isolated {1,4,7} test |
 | `rq1_box2el.csv` | RQ1 recovery/spurious, faithful Box²EL base | re-running with **NF4 = exact Box²EL** (@prover-confirmed, Head form) and **NF5/RIAs dropped** (box embeddings don't realise composition); supersedes the interim version |
