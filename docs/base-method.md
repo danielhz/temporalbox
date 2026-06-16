@@ -61,8 +61,7 @@ x_a−x_b ∈ Box(r). Per-time concept boxes; rigid role boxes.
 - `NF4 ∃r.C⊑D`: `Box(C)⊕Box(r) = box(c_C+c_r, o_C+o_r) ⊆ Box(D)`.
 - `NF5 r∘s⊑t`: `Box(r)⊕Box(s) = box(c_r+c_s, o_r+o_s) ⊆ Box(t)` — composition is
   *closed* for translation boxes (sound RIAs, unlike single-vector TransE).
-Derived from TransBox's relation semantics; exact match to Yang 2025 being
-confirmed with @prover. Faithful (their Thm 5.1). `--model transbox`. Trains to
+Exact Yang-2025 forms, **@prover-confirmed** (the learnable per-role offset o(r) is the translation-box feature; o(r)=0 would be TransE). Faithful (their Thm 5.1). `--model transbox`. Trains to
 loss 0 on NF1–NF5.
 
 **BoxEL base** — `model.BoxELModel` (the method §5 cites, "BoxEL throughout").
