@@ -1,0 +1,23 @@
+group,stat,value
+scale,concepts (positions + P279 ancestors),1727
+scale,positions used (>=1 dated membership),1169
+scale,individuals (office-holders),19862
+scale,membership statements (time-qualified P39),24641
+scale,time points (event ticks),2244
+scale,time span (clipped),[-1000 2026]
+hierarchy,subclass axioms P279 (NF1),2961
+hierarchy,entailed subsumptions (EL+ closure),72322
+hierarchy,max hierarchy depth,9
+hierarchy,positions with >=1 superclass (pct),86.0
+temporal,memberships with start P580 (pct),98.5
+temporal,memberships with end P582 (pct),86.0
+temporal,median term length (years),4
+temporal,multi-interval / Grover-Cleveland non-convex (pct),5.79
+temporal,succession-annotated P1365/P1366 (pct),68.4
+temporal,discretization,event-ticks
+density,median holders per position,6
+density,max holders per position,5542
+provenance,source,Wikidata-2026-04-dump
+provenance,root,Q48352-head-of-state
+provenance,P1001 coverage (pct),70.3
+provenance,P1001 time-qualified (pct),1.6
