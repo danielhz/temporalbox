@@ -58,12 +58,16 @@ def export_rq1(summary: dict, out: Path) -> None:
 
 def export_slice(summary: dict, out: Path) -> None:
     r = summary["result"]
+    # Report the dataset-side concept-name count (positions + P279 ancestors),
+    # not result["concepts"], which is +1 larger because the model pads a
+    # synthetic top (⊤) concept. The paper reports the dataset count.
+    concepts = summary.get("dataset", {}).get("concepts", r["concepts"])
     cols = ["concepts", "ticks", "individuals", "completeness_sampled",
             "spurious_rate_sampled", "loss_subsumption", "loss_membership"]
     with out.open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(cols)
-        w.writerow([r["concepts"], r["ticks"], r["individuals"],
+        w.writerow([concepts, r["ticks"], r["individuals"],
                     f"{r['completeness_sampled']:.4f}", f"{r['spurious_rate_sampled']:.4f}",
                     f"{r['loss_subsumption']:.3e}", f"{r['loss_membership']:.3e}"])
 
