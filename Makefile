@@ -15,7 +15,10 @@ RSYNC_OPTS  = --archive --compress --exclude='.git' \
               --exclude='.pytest_cache' --exclude='.ruff_cache' \
               --exclude='.venv' --exclude='*.egg-info'
 
-.PHONY: sync-push sync-pull sync-backup sync-roundtrip test lint
+RESULTS_ROOT ?= results
+DATASETS_OUT ?= datasets/synthetic
+
+.PHONY: sync-push sync-pull sync-backup sync-roundtrip test lint datasets
 
 ## Push local code to the GPU cluster (excluding results/).
 sync-push:
@@ -41,3 +44,8 @@ test:
 ## Lint with ruff.
 lint:
 	ruff check src/ tests/
+
+## Materialize the reported experiments' synthetic datasets from archived run
+## records (DaRUS deposit). Override RESULTS_ROOT / DATASETS_OUT as needed.
+datasets:
+	python scripts/materialize_datasets.py --results-root $(RESULTS_ROOT) --out $(DATASETS_OUT)
