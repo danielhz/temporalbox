@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: If you use this software, please cite the paper below; the archived version of this repository is part of the DaRUS deposit doi:10.18419/DARUS-6407.
+type: software
+title: "Faithful Box Embeddings for Linear Temporal EL+ — experiment code"
+license: MIT
+authors:
+  - family-names: "Hernández"
+    given-names: "Daniel"
+    orcid: "https://orcid.org/0000-0002-7896-0875"
+    affiliation: "University of Stuttgart"
+  - family-names: "Pan"
+    given-names: "Jiaxin"
+    orcid: "https://orcid.org/0000-0003-1055-7104"
+    affiliation: "University of Stuttgart"
+  - family-names: "Mohammed"
+    given-names: "Osama"
+    orcid: "https://orcid.org/0009-0002-3228-3036"
+    affiliation: "University of Stuttgart"
+  - family-names: "Thapa"
+    given-names: "Ratan Bahadur"
+    orcid: "https://orcid.org/0009-0000-2368-5928"
+    affiliation: "University of Stuttgart"
+  - family-names: "Staab"
+    given-names: "Steffen"
+    orcid: "https://orcid.org/0000-0002-0780-4154"
+    affiliation: "University of Stuttgart and University of Southampton"
+identifiers:
+  - type: doi
+    value: "10.18419/DARUS-6407"
+    description: "DaRUS deposit (code, Lean development, datasets, and run data)"
+preferred-citation:
+  type: conference-paper
+  title: "Faithful Box Embeddings for Linear Temporal EL+"
+  collection-title: "Proceedings of the 20th International Conference on Neurosymbolic Learning and Reasoning (NeSy 2026)"
+  year: 2026
+  url: "https://openreview.net/forum?id=kBys8aI0cc"
