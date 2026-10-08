@@ -97,7 +97,6 @@ def ranking_metrics(
     candidate list before ranking B (standard filtered protocol)."""
     n, T = scorer.n_concepts, scorer.n_positions
     top = vocab.top_id
-    names = vocab.id_to_concept
     # group entailed superconcepts by (A, t) for filtering
     sup_by: dict[tuple[str, int], set[str]] = {}
     for a, b, t in entailed:
