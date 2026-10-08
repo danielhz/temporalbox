@@ -91,18 +91,43 @@ def export_rq1bd(summary: dict, out: Path) -> None:
     print(f"wrote {rho_path}")
 
 
+def export_rq1_loss(summaries: list[dict], out: Path) -> None:
+    """Per-init (loss, completeness, spurious) points pooled across the RQ1
+    bases — the loss→faithfulness degradation data (camera-ready, Review 1).
+    Takes the three rq1_<base> summaries as inputs."""
+    cols = ["base", "data_seed", "init", "loss_total", "completeness", "spurious_rate"]
+    with out.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        for s in summaries:
+            base = s["config"]["model"]
+            for row in s["runs"]:
+                for pi in row["per_init"]:
+                    w.writerow([base, row["data_seed"], pi["init"],
+                                f"{pi['loss_total']:.3e}",
+                                f"{pi['completeness']:.4f}",
+                                f"{pi['spurious_rate']:.4f}"])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--kind", choices=["rq2", "rq1", "slice", "rq1bd"], required=True)
-    ap.add_argument("--in", dest="inp", required=True)
+    ap.add_argument("--kind", choices=["rq2", "rq1", "slice", "rq1bd", "rq1loss"], required=True)
+    ap.add_argument("--in", dest="inp", nargs="+", required=True,
+                    help="summary.json path(s); only rq1loss takes several")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    summary = json.loads(Path(args.inp).read_text())
+    summaries = [json.loads(Path(p).read_text()) for p in args.inp]
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fn = {"rq2": export_rq2, "rq1": export_rq1, "slice": export_slice, "rq1bd": export_rq1bd}[args.kind]
-    fn(summary, out)
+    if args.kind == "rq1loss":
+        export_rq1_loss(summaries, out)
+    else:
+        if len(summaries) != 1:
+            ap.error(f"--kind {args.kind} takes exactly one --in summary")
+        fn = {"rq2": export_rq2, "rq1": export_rq1, "slice": export_slice,
+              "rq1bd": export_rq1bd}[args.kind]
+        fn(summaries[0], out)
     if args.kind != "rq1bd":
         print(f"wrote {out}")
 
