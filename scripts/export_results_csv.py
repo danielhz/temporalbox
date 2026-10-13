@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Export experiment result data to tidy CSVs for @writer's TikZ/PGF figures.
+Export experiment result data to tidy CSVs for the paper's TikZ/PGF figures.
 
 This emits DATA ONLY — no plotting. Figures (TikZ/PGF) are part of the writing
 process and live in the paper repo; this script just turns the gitignored

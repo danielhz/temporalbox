@@ -1,6 +1,6 @@
 # Reproducibility summary (for the appendix "Hyperparameters and Reproducibility")
 
-`@coder`→`@writer` handoff: pinned versions, per-experiment hyperparameters,
+Handover from the experiment code to the paper: pinned versions, per-experiment hyperparameters,
 seeds, and data provenance. All experiments are regenerable from the committed
 scripts; see also `docs/base-method.md` (base methods) and
 `scripts/wikidata/README.md` (data pipeline).

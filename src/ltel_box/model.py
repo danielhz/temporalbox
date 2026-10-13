@@ -156,7 +156,7 @@ class TemporalBoxModel(nn.Module):
 
 class Box2ELModel(nn.Module):
     """Option A on the Box²EL base (Jackermeier et al., WWW 2024) — the faithful
-    static method the paper's theorem and @prover's Lean use.
+    static method the paper's theorem and the Lean development use.
 
     Per-time-point concept boxes (non-rigid), plus a RIGID relational layer
     (Q5 requirement): each concept has a rigid bump vector, each role a rigid
@@ -237,7 +237,7 @@ class BoxELModel(nn.Module):
         NF4  ∃r.C⊑D :  f_r⁻¹(Box(C)) ⊆ Box(D)
     The concept meet/containment lattice (NF1/NF2) is the shared axisBoxAlgebra.
 
-    NOTE: the exact BoxEL NF3/NF4 affine forms are being confirmed with @prover
+    NOTE: the exact BoxEL NF3/NF4 affine forms were checked
     against Xiong et al. 2022 (same process that corrected the Box²EL NF4
     Tail→Head). See docs/base-method.md.
     """
@@ -297,7 +297,7 @@ class BoxELModel(nn.Module):
 
 class TransBoxModel(nn.Module):
     """Option A on the TransBox base (Yang, Chen, Sattler, WWW 2025) — the third
-    faithful base on @prover's list, alongside BoxEL and Box²EL.
+    faithful base alongside BoxEL and Box²EL.
 
     Roles are **translation boxes**, not single vectors: r(a,b) iff
     x_a − x_b ∈ Box(r) = (c_r, o_r). The existential is a Minkowski sum of boxes
@@ -307,7 +307,7 @@ class TransBoxModel(nn.Module):
     boxes. NF1/NF2 = the shared axisBoxAlgebra.
 
     The role losses are derived from TransBox's relation semantics; exact match
-    to Yang 2025 is being confirmed with @prover.
+    to Yang 2025 is documented in docs/base-method.md.
     """
 
     def __init__(

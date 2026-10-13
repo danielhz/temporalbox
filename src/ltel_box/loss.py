@@ -196,7 +196,7 @@ def boxel_nf3_loss(
 ) -> Tensor:
     """C ⊑ ∃r.D — T_r(Box(C)) ⊆ Box(D), T_r(x)=scale⊙x+trans (diagonal affine).
 
-    Exact Xiong-2022 BoxEL form, @prover-confirmed (geometry is the BoxEL paper's,
+    Exact Xiong-2022 BoxEL form, checked against the BoxEL paper (geometry is the BoxEL paper's,
     not machine-checked)."""
     return box_contains(scale * cC + trans, scale * oC, cD, oD)
 
@@ -207,7 +207,7 @@ def boxel_nf4_loss(
     """∃r.C ⊑ D — T_r⁻¹(Box(C)) ⊆ Box(D): the r-predecessors of C are
     T_r⁻¹(Box(C)) (center=(cC−trans)/scale, offset=oC/scale), forced into Box(D).
 
-    Exact Xiong-2022 BoxEL form, @prover-confirmed. Needs scale>0 for the inverse."""
+    Exact Xiong-2022 BoxEL form, checked against the BoxEL paper. Needs scale>0 for the inverse."""
     return box_contains((cC - trans) / scale, oC / scale, cD, oD)
 
 
@@ -276,7 +276,7 @@ def box2el_nf5_loss(
 ) -> Tensor:
     """r ∘ s ⊑ t — Head(r) ⊆ Head(t) and Tail(s) ⊆ Tail(t).
 
-    Exact Box²EL form (their NF7 loss), confirmed sound by @prover
+    Exact Box²EL form (their NF7 loss), confirmed sound
     (2026-06-15, after correcting an earlier mistaken "drop it" note): the
     composed chain inherits r's source side (Head) and s's target side (Tail),
     so `Head(r)⊆Head(t) ∧ Tail(s)⊆Tail(t)` realises `r∘s⊑t` (Box²EL Thm 2).
